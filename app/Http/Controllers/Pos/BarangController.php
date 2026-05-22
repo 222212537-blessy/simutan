@@ -81,6 +81,10 @@ class BarangController extends Controller
                 $query->where('kelompok_id', $request->kelompok_id);
             }
 
+            if ($request->has('kategori_id') && !empty($request->kategori_id)) {
+                $query->where('kategori_id', $request->kategori_id);
+            }
+
             return DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('kelompok_barang', function ($row) {
