@@ -70,6 +70,7 @@
                                     <tr>
                                         <th width="10%" class="text-center">Kode</th>
                                         <th width="20%">Kelompok Barang</th>
+                                        <th width="20%">Kategori Barang</th>
                                         <th>Nama Barang</th>
                                         <th width="1%" class="text-center">Stok</th>
                                         <th width="1%" class="text-center">Satuan</th>
@@ -184,6 +185,10 @@
                 {
                     data: 'kelompok_barang',
                     name: 'kelompok_barang'
+                },
+                {
+                    data: 'kategori_barang',
+                    name: 'kategori_barang'
                 },
                 {
                     data: 'nama',

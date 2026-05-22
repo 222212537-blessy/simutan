@@ -17,6 +17,7 @@ use App\Exports\PemasukanExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Exception;
 
 class BarangController extends Controller
@@ -73,8 +74,8 @@ class BarangController extends Controller
     public function BarangAllAct(Request $request)
     {
         if ($request->ajax()) {
-            $query = Barang::with('kelompok')
-                ->select(['barangs.id', 'barangs.kode', 'barangs.kelompok_id', 'barangs.nama', 'barangs.qty_item', 'barangs.satuan', 'barangs.foto_barang', 'barangs.harga_total']);
+            $query = Barang::with(['kelompok', 'kategori'])
+                ->select(['barangs.id', 'barangs.kode', 'barangs.kelompok_id', 'barangs.kategori_id', 'barangs.nama', 'barangs.qty_item', 'barangs.satuan', 'barangs.foto_barang', 'barangs.harga_total']);
 
             if ($request->has('kelompok_id') && !empty($request->kelompok_id)) {
                 $query->where('kelompok_id', $request->kelompok_id);
@@ -84,6 +85,9 @@ class BarangController extends Controller
                 ->addIndexColumn()
                 ->addColumn('kelompok_barang', function ($row) {
                     return $row->kelompok->nama ?? 'Tidak ada data';
+                })
+                ->addColumn('kategori_barang', function ($row) {
+                    return $row->kategori->nama ?? 'Tidak ada data';
                 })
                 ->addColumn('harga_total', function ($row) {
                     // 1. Ambil nilai harga
@@ -153,22 +157,20 @@ class BarangController extends Controller
 
     public function barangStore(Request $request)
     {
+        $validated = $request->validate([
+            'kode_barang' => 'required|string|max:255|unique:barangs,kode',
+            'nama' => 'required|string|max:255',
+            'kelompok_id' => 'required|integer|exists:kelompoks,id',
+            'kategori_id' => 'required|integer|exists:kategoris,id',
+            'qty_item' => 'nullable|integer',
+            'satuan' => 'required|string',
+            'satuanBaru' => 'nullable|string|max:100',
+            'harga_total' => 'nullable|string',
+            'foto' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
 
-        // Validasi kode barang untuk memastikan tidak ada duplikasi
-        $existingBarang = Barang::where('kode', $request->kode_barang)->first();
-
-        if ($existingBarang) {
-            // Jika kode barang sudah ada, kembalikan dengan pesan error
-            $notification = array(
-                'message' => "Kode barang sudah terdaftar. Silakan gunakan kode yang berbeda.",
-                'alert-type' => "error"
-            );
-            return redirect()->back()->with($notification);
-        }
-
-
-        $satuan = $request->satuan;
-        $satuanBaru = $request->satuanBaru;
+        $satuan = $validated['satuan'];
+        $satuanBaru = $validated['satuanBaru'] ?? null;
 
         // Jika pilihan satuan adalah 'lainnya' dan satuanBaru tidak kosong
         if ($satuan === 'lainnya' && !empty($satuanBaru)) {
@@ -186,24 +188,24 @@ class BarangController extends Controller
 
         // Simpan data barang baru
         $barang = new Barang();
-        $barang->nama = $request->nama;
-        $barang->kode = $request->kode_barang;
-        $barang->kelompok_id = $request->kelompok_id;
-        $barang->qty_item = $request->qty_item;
+        $barang->nama = $validated['nama'];
+        $barang->kode = $validated['kode_barang'];
+        $barang->kelompok_id = $validated['kelompok_id'];
+        $barang->kategori_id = $validated['kategori_id'];
+        $barang->qty_item = $validated['qty_item'] ?? 0;
         $barang->satuan = $satuan; // Simpan satuan di kolom satuan
         $barang->created_at = Carbon::now();
         $barang->updated_at = Carbon::now();
-        $barang->harga_total = $request->harga_total;
+        $barang->harga_total = (int) preg_replace('/\D/', '', $validated['harga_total'] ?? '0');
 
         // Handle file upload
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
             $extension = $file->getClientOriginalExtension(); // Mendapatkan ekstensi file asli (jpg, jpeg, png, dll)
-            $fileName = 'foto_' . $request->kode_barang . '.' . $extension; // Gunakan ekstensi asli
-            $filePath = $file->storeAs('public/backend/assets/images/barang', $fileName); // Simpan file
+            $fileName = 'foto_' . $validated['kode_barang'] . '.' . $extension;
+            $file->storeAs('backend/assets/images/barang', $fileName, 'public'); // Simpan file ke disk public
 
-            $filePath = str_replace('public/', '', $filePath); // Update path relatif
-            $barang->foto_barang = $filePath; // Simpan path file di database
+            $barang->foto_barang = 'backend/assets/images/barang/' . $fileName; // Simpan path relatif untuk asset storage
         } else {
             $barang->foto_barang = null; // Jika tidak ada foto, simpan nilai null
         }
@@ -298,7 +300,9 @@ class BarangController extends Controller
         $satuans = Barang::select('satuan')->distinct()->pluck('satuan'); // Mengambil koleksi string
 
         $barang = Barang::findOrFail($id);
-        return view('backend.barang.barang_edit', compact('barang', 'kelompok', 'satuans'));
+        $kategori = Kategori::where('kelompok_id', $barang->kelompok_id)->get();
+
+        return view('backend.barang.barang_edit', compact('barang', 'kelompok', 'satuans', 'kategori'));
     }
 
 
@@ -310,6 +314,7 @@ class BarangController extends Controller
         'kode_barang' => 'required|string|max:255',
         'nama' => 'required|string|max:255',
         'kelompok_id' => 'required|integer|exists:kelompoks,id',
+        'kategori_id' => 'required|integer|exists:kategoris,id',
         'qty_item' => 'nullable|integer',
         'satuan' => 'required|string',
         'satuanBaru' => 'nullable|string|max:100',
@@ -344,17 +349,30 @@ class BarangController extends Controller
         }
 
 
-        // Tangani upload foto (simpan ke storage/app/public/backend/assets/images/barang)
-        if ($request->hasFile('foto')) {
-        $file = $request->file('foto');
-        $extension = $file->getClientOriginalExtension();
-        $filename = 'foto_' . $kode_barang . '_' . time() . '.' . $extension;
-        $file->storeAs('public/backend/assets/images/barang', $filename);
-        // Simpan path relatif yang sama seperti yang dipakai di blade: 'backend/assets/images/barang/...' (tanpa prefix 'public/')
-        $fotoPath = 'backend/assets/images/barang/' . $filename;
-        } else {
-        // Jika tidak ada upload baru, gunakan path lama
+        // Tangani upload foto (simpan ke disk public backend/assets/images/barang)
         $fotoPath = $barang->foto_barang;
+        if ($request->hasFile('foto')) {
+            $file = $request->file('foto');
+            $extension = $file->getClientOriginalExtension();
+            $filename = 'foto_' . $validated['kode_barang'] . '.' . $extension;
+            $newFotoPath = 'backend/assets/images/barang/' . $filename;
+            $file->storeAs('backend/assets/images/barang', $filename, 'public');
+
+            if ($barang->foto_barang && $barang->foto_barang !== $newFotoPath && Storage::disk('public')->exists($barang->foto_barang)) {
+                Storage::disk('public')->delete($barang->foto_barang);
+            }
+
+            $fotoPath = $newFotoPath;
+        } elseif ($barang->foto_barang && $validated['kode_barang'] !== $barang->kode) {
+            $oldFotoPath = $barang->foto_barang;
+            $oldExtension = pathinfo($oldFotoPath, PATHINFO_EXTENSION);
+            $newFilename = 'foto_' . $validated['kode_barang'] . '.' . $oldExtension;
+            $newFotoPath = 'backend/assets/images/barang/' . $newFilename;
+
+            if (Storage::disk('public')->exists($oldFotoPath)) {
+                Storage::disk('public')->move($oldFotoPath, $newFotoPath);
+                $fotoPath = $newFotoPath;
+            }
         }
 
 
@@ -363,6 +381,7 @@ class BarangController extends Controller
         'kode' => $validated['kode_barang'],
         'nama' => $validated['nama'],
         'kelompok_id' => $validated['kelompok_id'],
+        'kategori_id' => $validated['kategori_id'],
         'qty_item' => $validated['qty_item'] ?? 0,
         'satuan' => $satuan,
         'foto_barang' => $fotoPath,

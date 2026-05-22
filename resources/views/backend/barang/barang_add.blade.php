@@ -50,7 +50,7 @@
                             <div class="row mb-3">
                                 <label for="kelompok_barang" class="col-sm-2 col-form-label">Kelompok Barang <span class="text-danger">*</span></label>
                                 <div class="col-sm-10">
-                                    <select name="kelompok_id" class="form-select" aria-label="Default select example" required>
+                                    <select id="kelompok_select" name="kelompok_id" class="form-select" aria-label="Default select example" required>
                                         <option selected="" disabled>Pilih jenis kelompok barang</option>
                                         @foreach($kelompok as $kel)
                                         <option value="{{$kel->id}}">{{$kel->nama}}</option>
@@ -62,7 +62,7 @@
                             <div class="row mb-3">
                                 <label for="kategori_barang" class="col-sm-2 col-form-label">Kategori Barang <span class="text-danger">*</span></label>
                                 <div class="col-sm-10">
-                                    <select name="kategori_id" class="form-select" aria-label="Default select example" required>
+                                    <select id="kategori_select" name="kategori_id" class="form-select" aria-label="Default select example" required>
                                         <option selected="" disabled>Pilih kategori barang</option>
                                         @foreach($kategori as $kat)
                                         <option value="{{$kat->id}}">{{$kat->nama}}</option>
@@ -145,7 +145,7 @@
                                 <label for="foto" class="col-sm-2 col-form-label">Foto Barang <span class="text-danger">*</span></label>
                                 <div class="form-group col-sm-10">
                                     <input name="foto" class="form-control" type="file" id="foto" accept=".jpg,.jpeg,.png">
-                                    <small class="form-text text-muted">Usahakan gambar dalam bentuk PNG, JPEG atau JPG untuk hasil yang lebih baik.</small>
+                                    <small class="form-text text-muted">Usahakan gambar dalam bentuk PNG, JPEG atau JPG untuk hasil yang lebih baik dengan format nama foto_"kode barang".</small>
                                 </div>
                             </div>
 
@@ -237,6 +237,44 @@
             unhighlight : function(element, errorClass, validClass) {
                 $(element).removeClass('is-invalid');
             },
+        });
+    });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const kelompokSelect = document.getElementById('kelompok_select');
+        const kategoriSelect = document.getElementById('kategori_select');
+        const kategoriUrl = '{{ url('pilihan/get-kategori') }}';
+
+        function loadKategoriOptions(kelompokId) {
+            kategoriSelect.innerHTML = '<option disabled selected>Mengambil kategori...</option>';
+
+            fetch(`${kategoriUrl}/${kelompokId}`)
+                .then(response => response.json())
+                .then(data => {
+                    kategoriSelect.innerHTML = '<option disabled selected>Pilih kategori barang</option>';
+                    if (Array.isArray(data) && data.length) {
+                        data.forEach(kategori => {
+                            const option = document.createElement('option');
+                            option.value = kategori.id;
+                            option.textContent = kategori.nama;
+                            kategoriSelect.appendChild(option);
+                        });
+                    } else {
+                        kategoriSelect.innerHTML = '<option disabled selected>Tidak ada kategori untuk kelompok ini</option>';
+                    }
+                })
+                .catch(() => {
+                    kategoriSelect.innerHTML = '<option disabled selected>Gagal memuat kategori</option>';
+                });
+        }
+
+        kelompokSelect.addEventListener('change', function() {
+            const kelompokId = this.value;
+            if (kelompokId) {
+                loadKategoriOptions(kelompokId);
+            }
         });
     });
 </script>

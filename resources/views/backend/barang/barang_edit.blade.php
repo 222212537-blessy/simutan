@@ -2,7 +2,6 @@
 @section(auth()->user()->role === 'admin' ? 'admin' : (auth()->user()->role === 'supervisor' ? 'supervisor' : 'pegawai'))
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.7/dist/handlebars.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -19,7 +18,7 @@
                             @method('POST') <!-- Menggunakan method PUT untuk update -->
 
                             <input type="hidden" name="id" value="{{ $barang->id }}">
-                            <input type="hidden" name="existing_foto" value="{{ $barang->foto }}"> <!-- Menyimpan nama foto yang ada -->
+                            <input type="hidden" name="existing_foto" value="{{ $barang->foto_barang }}"> <!-- Menyimpan nama foto yang ada -->
 
                             <div class="row mb-3">
                                 <label for="kode_barang" class="col-sm-2 col-form-label">Kode Barang <span class="text-danger">*</span></label>
@@ -38,10 +37,22 @@
                             <div class="row mb-3">
                                 <label for="kelompok_barang" class="col-sm-2 col-form-label">Kelompok Barang <span class="text-danger">*</span></label>
                                 <div class="col-sm-10">
-                                    <select name="kelompok_id" class="form-select" required>
+                                    <select id="kelompok_select" name="kelompok_id" class="form-select" required>
                                         <option selected="" disabled>Pilih jenis kelompok barang</option>
                                         @foreach($kelompok as $kel)
                                         <option value="{{$kel->id}}" {{ $kel->id == $barang->kelompok_id ? 'selected' : '' }}>{{$kel->nama}}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label for="kategori_barang" class="col-sm-2 col-form-label">Kategori Barang <span class="text-danger">*</span></label>
+                                <div class="col-sm-10">
+                                    <select id="kategori_select" name="kategori_id" class="form-select" required>
+                                        <option selected disabled>Pilih kategori barang</option>
+                                        @foreach($kategori as $kat)
+                                            <option value="{{ $kat->id }}" {{ $kat->id == $barang->kategori_id ? 'selected' : '' }}>{{ $kat->nama }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -89,9 +100,7 @@
                             <script type="text/javascript">
                                 // --- FUNGSI FORMAT DINAMIS SAAT MENGETIK ---
                                 function formatRupiah(input) {
-                                    // Hapus semua karakter non-digit (termasuk titik yang sudah ada)
                                     let number_string = input.value.replace(/\D/g, '').toString();
-                                    
                                     let sisa = number_string.length % 3;
                                     let rupiah = number_string.substr(0, sisa);
                                     let ribuan = number_string.substr(sisa).match(/\d{3}/gi);
@@ -100,30 +109,110 @@
                                         let separator = sisa ? '.' : '';
                                         rupiah += separator + ribuan.join('.');
                                     }
-                                    
+
                                     input.value = rupiah;
                                 }
 
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    const satuanSelect = document.getElementById('satuan');
+                                    const satuanBaruContainer = document.getElementById('satuanBaruContainer');
+                                    const satuanBaruInput = document.getElementById('satuanBaru');
+                                    const kelompokSelect = document.getElementById('kelompok_select');
+                                    const kategoriSelect = document.getElementById('kategori_select');
+                                    const form = document.getElementById('myForm');
+                                    const kategoriUrl = '{{ url('pilihan/get-kategori') }}';
+                                    const selectedKategoriId = '{{ $barang->kategori_id }}';
 
-                                // --- LOGIKA SUBMIT DAN PEMBESIHAN NILAI (MENGGUNAKAN JQUERY) ---
-                                $(document).ready(function() {
-                                    // Logika untuk menampilkan SatuanBaruContainer
-                                    // ... (Kode untuk satuanBaruContainer di sini, tidak berubah) ...
-                                    
-                                    // Memastikan tombol edit bekerja dan membersihkan nilai
+                                    function loadKategoriOptions(kelompokId, selectedKategori = null) {
+                                        kategoriSelect.innerHTML = '<option disabled selected>Mengambil kategori...</option>';
+
+                                        fetch(`${kategoriUrl}/${kelompokId}`)
+                                            .then(response => response.json())
+                                            .then(data => {
+                                                if (!Array.isArray(data) || data.length === 0) {
+                                                    kategoriSelect.innerHTML = '<option disabled selected>Tidak ada kategori untuk kelompok ini</option>';
+                                                    return;
+                                                }
+
+                                                kategoriSelect.innerHTML = '<option disabled selected>Pilih kategori barang</option>';
+
+                                                data.forEach(kategori => {
+                                                    const option = document.createElement('option');
+                                                    option.value = kategori.id;
+                                                    option.textContent = kategori.nama;
+                                                    if (selectedKategori && kategori.id == selectedKategori) {
+                                                        option.selected = true;
+                                                    }
+                                                    kategoriSelect.appendChild(option);
+                                                });
+                                            })
+                                            .catch(() => {
+                                                kategoriSelect.innerHTML = '<option disabled selected>Gagal memuat kategori</option>';
+                                            });
+                                    }
+
+                                    satuanSelect.addEventListener('change', function() {
+                                        if (this.value === 'lainnya') {
+                                            satuanBaruContainer.style.display = 'block';
+                                            satuanBaruInput.disabled = false;
+                                        } else {
+                                            satuanBaruContainer.style.display = 'none';
+                                            satuanBaruInput.disabled = true;
+                                            satuanBaruInput.value = '';
+                                        }
+                                    });
+
+                                    kelompokSelect.addEventListener('change', function() {
+                                        const kelompokId = this.value;
+                                        if (kelompokId) {
+                                            loadKategoriOptions(kelompokId);
+                                        }
+                                    });
+
+                                    form.addEventListener('submit', function(event) {
+                                        const formattedValue = document.getElementById('harga_total').value;
+                                        const rawValue = formattedValue.replace(/\./g, '');
+                                        document.getElementById('harga_total').value = rawValue;
+                                    });
+
+                                    if (kelompokSelect.value) {
+                                        loadKategoriOptions(kelompokSelect.value, selectedKategoriId);
+                                    }
+
+                                    $('#myForm').validate({
+                                        rules: {
+                                            nama: { required: true },
+                                            kelompok_id: { required: true },
+                                            kategori_id: { required: true },
+                                            kode_barang: { required: true },
+                                            satuan: { required: true }
+                                        },
+                                        messages: {
+                                            nama: { required: "Nama barang harus diisi." },
+                                            kelompok_id: { required: "Kelompok barang harus dipilih." },
+                                            kategori_id: { required: "Kategori barang harus dipilih." },
+                                            kode_barang: { required: "Kode barang harus diisi." },
+                                            satuan: { required: "Satuan barang harus dipilih." }
+                                        },
+                                        errorElement : 'span',
+                                        errorPlacement: function (error, element) {
+                                            error.addClass('invalid-feedback');
+                                            element.closest('.form-group').append(error);
+                                        },
+                                        highlight : function(element, errorClass, validClass) {
+                                            $(element).addClass('is-invalid');
+                                        },
+                                        unhighlight : function(element, errorClass, validClass) {
+                                            $(element).removeClass('is-invalid');
+                                        }
+                                    });
+
                                     $('#editBtn').on('click', function(e) {
-                                        e.preventDefault(); 
-                                        
-                                        // 1. Ambil nilai yang diformat dari input (misal: "1.500.000")
-                                        let currentFormattedValue = $('#harga_total').val();
-                                        
-                                        // 2. HAPUS TITIK: Konversi ke nilai angka mentah (misal: "1500000")
-                                        let rawValue = formattedValue.replace(/\./g, '');
-
-                                        // 3. SET NILAI INPUT KE ANGKA MENTAH SEBELUM VALIDASI & SUBMIT
+                                        e.preventDefault();
+                                        const currentFormattedValue = $('#harga_total').val();
+                                        const rawValue = currentFormattedValue.replace(/\./g, '');
                                         $('#harga_total').val(rawValue);
 
-                                        // 4. Lanjutkan dengan validasi jQuery
                                         if ($('#myForm').valid()) {
                                             Swal.fire({
                                                 title: 'Apakah Anda yakin?',
@@ -135,14 +224,12 @@
                                                 confirmButtonText: 'Ya, simpan perubahan!'
                                             }).then((result) => {
                                                 if (result.isConfirmed) {
-                                                    $('#myForm').submit(); // Submit nilai mentah
+                                                    $('#myForm').submit();
                                                 } else {
-                                                    // Jika batal, kembalikan format tampilan
                                                     $('#harga_total').val(currentFormattedValue);
                                                 }
                                             });
                                         } else {
-                                            // Jika validasi gagal, kembalikan format tampilan
                                             $('#harga_total').val(currentFormattedValue);
                                         }
                                     });
@@ -153,10 +240,10 @@
                                 <label for="foto" class="col-sm-2 col-form-label">Foto Barang <span class="text-danger">*</span></label>
                                 <div class="form-group col-sm-10">
                                     @if($barang->foto_barang)
-                                        <p class="text-success">Foto saat ini:</p>
+                                        <p class="text-success mb-1">Foto lama:</p>
+                                        <p class="text-muted small">{{ basename($barang->foto_barang) }}</p>
                                         <div class="mt-2">
-                                            <!-- Menggunakan path lengkap dari barang->foto -->
-                                            <img src="{{ asset('storage/' . $barang->foto_barang) }}" alt="Foto Barang" class="img-fluid" style="max-width: 200px;">
+                                            <img src="{{ asset('storage/' . $barang->foto_barang) }}" alt="Foto Barang" class="img-fluid" style="max-width: 200px;" onerror="this.onerror=null; this.src='{{ asset('/backend/assets/images/barang/default_atk.png') }}';">
                                         </div>
                                     @else
                                         <p class="text-warning">Belum ada foto</p>
@@ -177,100 +264,6 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const satuanSelect = document.getElementById('satuan');
-        const satuanBaruContainer = document.getElementById('satuanBaruContainer');
-        const satuanBaruInput = document.getElementById('satuanBaru');
-        const form = document.getElementById('myForm');
-
-        satuanSelect.addEventListener('change', function() {
-            if (this.value === 'lainnya') {
-                satuanBaruContainer.style.display = 'block'; // Show the input and label
-                satuanBaruInput.disabled = false; // Enable input field
-            } else {
-                satuanBaruContainer.style.display = 'none'; // Hide the input and label
-                satuanBaruInput.disabled = true;  // Disable input field
-                satuanBaruInput.value = '';       // Clear input field
-            }
-        });
-
-        form.addEventListener('submit', function() {
-            if (satuanSelect.value === 'lainnya') {
-                const satuanBaruValue = satuanBaruInput.value;
-                const hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = 'satuanBaru';
-                hiddenInput.value = satuanBaruValue;
-                form.appendChild(hiddenInput);
-            }
-        });
-    });
-</script>
-
-<script type="text/javascript">
-    $(document).ready(function (){
-        $('#myForm').validate({
-            rules: {
-                nama: {
-                    required : true,
-                },
-                kelompok_id: {
-                    required: true,
-                },
-                kode_barang: {
-                    required: true,
-                },
-                satuan: {
-                    required: true,
-                }
-            },
-            messages: {
-                nama: {
-                    required: "Nama barang harus diisi.",
-                },
-                kelompok_id: {
-                    required: "Kelompok barang harus dipilih.",
-                },
-                kode_barang: {
-                    required: "Kode barang harus diisi.",
-                },
-                satuan: {
-                    required: "Satuan barang harus dipilih.",
-                }
-            },
-            errorElement : 'span', 
-            errorPlacement: function (error, element) {
-                error.addClass('invalid-feedback');
-                element.closest('.form-group').append(error);
-            },
-            highlight : function(element, errorClass, validClass) {
-                $(element).addClass('is-invalid');
-            },
-            unhighlight : function(element, errorClass, validClass) {
-                $(element).removeClass('is-invalid');
-            },
-        });
-    });
-</script>
-
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    document.getElementById('editBtn').addEventListener('click', function() {
-        Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: "Perubahan akan disimpan!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, simpan perubahan!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Jika pengguna mengkonfirmasi, submit form secara manual
-                document.getElementById('myForm').submit();
-            }
-        });
-    });
-</script>
 
 @endsection
