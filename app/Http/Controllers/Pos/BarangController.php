@@ -101,7 +101,7 @@ class BarangController extends Controller
                     return number_format($harga, 0, ',', '.'); // Hasil: "1.500.000"
                 })
                 ->addColumn('foto_barang', function ($row) {
-                    return $row->foto_barang ? '<img src="' . asset('storage/' . $row->foto_barang) . '" alt="Foto Barang" style="width: 50px; height: 50px;">' : 'Tidak ada foto';
+                    return $row->foto_barang ? '<img src="' . asset($row->foto_barang) . '" alt="Foto Barang" style="width: 50px; height: 50px;">' : 'Tidak ada foto';
                 })
                 ->addColumn('action', function ($row) {
                     return '<div class="table-actions" style="text-align: center; vertical-align: middle;">
@@ -205,13 +205,19 @@ class BarangController extends Controller
         // Handle file upload
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
-            $extension = $file->getClientOriginalExtension(); // Mendapatkan ekstensi file asli (jpg, jpeg, png, dll)
+            $extension = $file->getClientOriginalExtension();
             $fileName = 'foto_' . $validated['kode_barang'] . '.' . $extension;
-            $file->storeAs('backend/assets/images/barang', $fileName, 'public'); // Simpan file ke disk public
-
-            $barang->foto_barang = 'backend/assets/images/barang/' . $fileName; // Simpan path relatif untuk asset storage
+            $destinationPath = public_path('backend/assets/images/barang');
+            
+            // Buat folder jika belum ada
+            if (!is_dir($destinationPath)) {
+                mkdir($destinationPath, 0755, true);
+            }
+            
+            $file->move($destinationPath, $fileName);
+            $barang->foto_barang = 'backend/assets/images/barang/' . $fileName;
         } else {
-            $barang->foto_barang = null; // Jika tidak ada foto, simpan nilai null
+            $barang->foto_barang = null;
         }
 
         $barang->save();
@@ -353,29 +359,41 @@ class BarangController extends Controller
         }
 
 
-        // Tangani upload foto (simpan ke disk public backend/assets/images/barang)
+        // Tangani upload foto (simpan ke public backend/assets/images/barang)
         $fotoPath = $barang->foto_barang;
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
             $extension = $file->getClientOriginalExtension();
             $filename = 'foto_' . $validated['kode_barang'] . '.' . $extension;
+            $destinationPath = public_path('backend/assets/images/barang');
+            
+            // Buat folder jika belum ada
+            if (!is_dir($destinationPath)) {
+                mkdir($destinationPath, 0755, true);
+            }
+            
+            $file->move($destinationPath, $filename);
             $newFotoPath = 'backend/assets/images/barang/' . $filename;
-            $file->storeAs('backend/assets/images/barang', $filename, 'public');
 
-            if ($barang->foto_barang && $barang->foto_barang !== $newFotoPath && Storage::disk('public')->exists($barang->foto_barang)) {
-                Storage::disk('public')->delete($barang->foto_barang);
+            // Hapus file lama jika ada
+            if ($barang->foto_barang && $barang->foto_barang !== $newFotoPath) {
+                $oldFilePath = public_path($barang->foto_barang);
+                if (file_exists($oldFilePath)) {
+                    unlink($oldFilePath);
+                }
             }
 
             $fotoPath = $newFotoPath;
         } elseif ($barang->foto_barang && $validated['kode_barang'] !== $barang->kode) {
-            $oldFotoPath = $barang->foto_barang;
+            // Rename file jika kode barang berubah tapi foto tidak di-upload ulang
+            $oldFotoPath = public_path($barang->foto_barang);
             $oldExtension = pathinfo($oldFotoPath, PATHINFO_EXTENSION);
             $newFilename = 'foto_' . $validated['kode_barang'] . '.' . $oldExtension;
-            $newFotoPath = 'backend/assets/images/barang/' . $newFilename;
+            $newFotoPath = public_path('backend/assets/images/barang/' . $newFilename);
 
-            if (Storage::disk('public')->exists($oldFotoPath)) {
-                Storage::disk('public')->move($oldFotoPath, $newFotoPath);
-                $fotoPath = $newFotoPath;
+            if (file_exists($oldFotoPath)) {
+                rename($oldFotoPath, $newFotoPath);
+                $fotoPath = 'backend/assets/images/barang/' . $newFilename;
             }
         }
 

@@ -2,6 +2,8 @@
 @section(auth()->user()->role === 'admin' ? 'admin' : (auth()->user()->role === 'supervisor' ? 'supervisor' : 'pegawai'))
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/jquery.validation/1.19.5/jquery.validate.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.7/dist/handlebars.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -15,7 +17,6 @@
 
                         <form method="POST" action="{{ route('barang.update', $barang->id) }}" id="myForm" enctype="multipart/form-data">
                             @csrf
-                            @method('POST') <!-- Menggunakan method PUT untuk update -->
 
                             <input type="hidden" name="id" value="{{ $barang->id }}">
                             <input type="hidden" name="existing_foto" value="{{ $barang->foto_barang }}"> <!-- Menyimpan nama foto yang ada -->
@@ -169,84 +170,85 @@
                                         }
                                     });
 
-                                    form.addEventListener('submit', function(event) {
-                                        const formattedValue = document.getElementById('harga_total').value;
-                                        const rawValue = formattedValue.replace(/\./g, '');
-                                        document.getElementById('harga_total').value = rawValue;
-                                    });
+                                    // previous harga_total strip on submit removed; handled in submitHandler
 
                                     if (kelompokSelect.value) {
                                         loadKategoriOptions(kelompokSelect.value, selectedKategoriId);
                                     }
 
-                                    $('#myForm').validate({
-                                        rules: {
-                                            nama: { required: true },
-                                            kelompok_id: { required: true },
-                                            kategori_id: { required: true },
-                                            kode_barang: { required: true },
-                                            satuan: { required: true }
-                                        },
-                                        messages: {
-                                            nama: { required: "Nama barang harus diisi." },
-                                            kelompok_id: { required: "Kelompok barang harus dipilih." },
-                                            kategori_id: { required: "Kategori barang harus dipilih." },
-                                            kode_barang: { required: "Kode barang harus diisi." },
-                                            satuan: { required: "Satuan barang harus dipilih." }
-                                        },
-                                        errorElement : 'span',
-                                        errorPlacement: function (error, element) {
-                                            error.addClass('invalid-feedback');
-                                            element.closest('.form-group').append(error);
-                                        },
-                                        highlight : function(element, errorClass, validClass) {
-                                            $(element).addClass('is-invalid');
-                                        },
-                                        unhighlight : function(element, errorClass, validClass) {
-                                            $(element).removeClass('is-invalid');
-                                        }
-                                    });
-
-                                    $('#editBtn').on('click', function(e) {
-                                        e.preventDefault();
-                                        const currentFormattedValue = $('#harga_total').val();
+                                    // Pure JS form submit handler (HTML5 validation + SweetAlert confirmation)
+                                    const submitHandler = function(event) {
+                                        event.preventDefault();
+                                        const hargaEl = document.getElementById('harga_total');
+                                        const currentFormattedValue = hargaEl.value;
                                         const rawValue = currentFormattedValue.replace(/\./g, '');
-                                        $('#harga_total').val(rawValue);
 
-                                        if ($('#myForm').valid()) {
-                                            Swal.fire({
-                                                title: 'Apakah Anda yakin?',
-                                                text: "Perubahan akan disimpan!",
-                                                icon: 'warning',
-                                                showCancelButton: true,
-                                                confirmButtonColor: '#3085d6',
-                                                cancelButtonColor: '#d33',
-                                                confirmButtonText: 'Ya, simpan perubahan!'
-                                            }).then((result) => {
-                                                if (result.isConfirmed) {
-                                                    $('#myForm').submit();
-                                                } else {
-                                                    $('#harga_total').val(currentFormattedValue);
-                                                }
-                                            });
-                                        } else {
-                                            $('#harga_total').val(currentFormattedValue);
+                                        // Basic required fields validation (matches previous rules)
+                                        const requiredNames = ['nama', 'kelompok_id', 'kategori_id', 'kode_barang', 'satuan'];
+                                        let valid = true;
+                                        for (let name of requiredNames) {
+                                            const el = document.querySelector('[name="' + name + '"]');
+                                            if (!el) continue;
+                                            // for select, check selected value
+                                            if (el.tagName === 'SELECT') {
+                                                if (!el.value) { valid = false; el.classList.add('is-invalid'); }
+                                                else el.classList.remove('is-invalid');
+                                            } else {
+                                                if (!el.value || el.value.trim() === '') { valid = false; el.classList.add('is-invalid'); }
+                                                else el.classList.remove('is-invalid');
+                                            }
                                         }
-                                    });
+
+                                        if (!valid) {
+                                            // show native validation UI
+                                            if (typeof form.reportValidity === 'function') {
+                                                form.reportValidity();
+                                            }
+                                            return;
+                                        }
+
+                                        Swal.fire({
+                                            title: 'Apakah Anda yakin?',
+                                            text: 'Perubahan akan disimpan!',
+                                            icon: 'warning',
+                                            showCancelButton: true,
+                                            confirmButtonColor: '#3085d6',
+                                            cancelButtonColor: '#d33',
+                                            confirmButtonText: 'Ya, simpan perubahan!'
+                                        }).then((result) => {
+                                            if (result.isConfirmed) {
+                                                // set raw value and submit
+                                                hargaEl.value = rawValue;
+                                                form.submit();
+                                            } else {
+                                                hargaEl.value = currentFormattedValue;
+                                            }
+                                        });
+                                    };
+
+                                    // Attach pure JS submit handler to the form
+                                    form.removeEventListener('submit', submitHandler);
+                                    form.addEventListener('submit', submitHandler);
                                 });
                             </script>
 
                             <div class="row mb-3">
                                 <label for="foto" class="col-sm-2 col-form-label">Foto Barang <span class="text-danger">*</span></label>
                                 <div class="form-group col-sm-10">
-                                    @if($barang->foto_barang)
+                                    @if($barang->foto_barang && file_exists(public_path($barang->foto_barang)))
                                         <p class="text-success mb-1">Foto lama:</p>
                                         <p class="text-muted small">{{ basename($barang->foto_barang) }}</p>
                                         <div class="mt-2">
-                                            <img src="{{ asset('storage/' . $barang->foto_barang) }}" alt="Foto Barang" class="img-fluid" style="max-width: 200px;" onerror="this.onerror=null; this.src='{{ asset('/backend/assets/images/barang/default_atk.png') }}';">
+                                            <img src="{{ asset($barang->foto_barang) }}" alt="Foto Barang" class="img-fluid" style="max-width: 200px;">
                                         </div>
                                     @else
-                                        <p class="text-warning">Belum ada foto</p>
+                                        <p class="text-warning">
+                                            @if($barang->foto_barang)
+                                                Foto lama: <strong>{{ basename($barang->foto_barang) }}</strong> (File tidak ditemukan - silakan upload ulang)
+                                            @else
+                                                Belum ada foto
+                                            @endif
+                                        </p>
                                     @endif
 
                                     <input name="foto" class="form-control mt-2" type="file" id="foto" accept=".jpg,.jpeg,.png">
@@ -254,7 +256,7 @@
                                 </div>
                             </div>
                             <div class="d-flex justify-content-end">
-                                <button type="button" id="editBtn" class="btn btn-info waves-effect waves-light">Edit Barang</button>
+                                <button type="submit" id="editBtn" class="btn btn-info waves-effect waves-light">Edit Barang</button>
                             </div>
                         </form>
                     </div>
@@ -263,7 +265,5 @@
         </div>
     </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 @endsection
