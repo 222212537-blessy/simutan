@@ -360,40 +360,42 @@ class BarangController extends Controller
 
 
         // Tangani upload foto (simpan ke public backend/assets/images/barang)
-        $fotoPath = $barang->foto_barang;
+        $fotoPath = $barang->foto_barang; // Menyimpan nilai nama file foto yang ada saat ini
+        $destinationPath = public_path('backend/assets/images/barang');
+
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
             $extension = $file->getClientOriginalExtension();
             $filename = 'foto_' . $validated['kode_barang'] . '.' . $extension;
-            $destinationPath = public_path('backend/assets/images/barang');
             
             // Buat folder jika belum ada
             if (!is_dir($destinationPath)) {
                 mkdir($destinationPath, 0755, true);
             }
             
-            $file->move($destinationPath, $filename);
-            $newFotoPath = 'backend/assets/images/barang/' . $filename;
-
-            // Hapus file lama jika ada
-            if ($barang->foto_barang && $barang->foto_barang !== $newFotoPath) {
-                $oldFilePath = public_path($barang->foto_barang);
-                if (file_exists($oldFilePath)) {
-                    unlink($oldFilePath);
-                }
+            // Hapus file fisik lama jika sebelumnya sudah ada fotonya di folder
+            if ($barang->foto_barang && file_exists($destinationPath . '/' . $barang->foto_barang)) {
+                @unlink($destinationPath . '/' . $barang->foto_barang);
             }
 
-            $fotoPath = $newFotoPath;
+            // Pindahkan file foto baru ke folder tujuan
+            $file->move($destinationPath, $filename);
+            
+            // 💡 PERBAIKAN: Hanya simpan NAMA FILE-nya saja ke database agar sesuai dengan view Blade Anda
+            $fotoPath = $filename; 
+
         } elseif ($barang->foto_barang && $validated['kode_barang'] !== $barang->kode) {
-            // Rename file jika kode barang berubah tapi foto tidak di-upload ulang
-            $oldFotoPath = public_path($barang->foto_barang);
+            // Rename file jika kode barang berubah di form tapi user tidak mengupload foto baru
+            $oldFotoPath = $destinationPath . '/' . $barang->foto_barang;
             $oldExtension = pathinfo($oldFotoPath, PATHINFO_EXTENSION);
             $newFilename = 'foto_' . $validated['kode_barang'] . '.' . $oldExtension;
-            $newFotoPath = public_path('backend/assets/images/barang/' . $newFilename);
+            $newFotoPath = $destinationPath . '/' . $newFilename;
 
             if (file_exists($oldFotoPath)) {
                 rename($oldFotoPath, $newFotoPath);
-                $fotoPath = 'backend/assets/images/barang/' . $newFilename;
+                
+                // 💡 PERBAIKAN: Update variabel nama file baru hasil rename untuk database
+                $fotoPath = $newFilename; 
             }
         }
 
@@ -406,7 +408,7 @@ class BarangController extends Controller
         'kategori_id' => $validated['kategori_id'],
         'qty_item' => $validated['qty_item'] ?? 0,
         'satuan' => $satuan,
-        'foto_barang' => $fotoPath,
+        'foto_barang' => $fotoPath, // Pastikan nilai terbaru ini masuk dengan aman ke database
         'harga_total' => $hargaTotalMentah,
         // updated_at otomatis di-handle oleh Eloquent
         ]);
@@ -542,6 +544,12 @@ class BarangController extends Controller
         } else {
             return redirect()->back()->with('error', 'File Excel tidak ditemukan!');
         }
+    }
+
+    public function getKategori($kelompok_id)
+    {
+        $kategori = Kategori::where('kelompok_id', $kelompok_id)->get();
+        return response()->json($kategori);
     }
 
 }

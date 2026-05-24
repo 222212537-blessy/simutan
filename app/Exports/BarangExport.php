@@ -44,13 +44,15 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
 
             $stokPadaTanggal = ($stokAwal ? $stokAwal->qty_awal : 0) + $totalPemasukan - $totalPengeluaran;
 
+            $hargaBeliSatuan = ($item->qty_item > 0) ? $item->harga_total / $item->qty_item : 0;
+
             return [
                 'NO' => $key + 1,
                 'Uraian Barang' => $item->nama,
                 'Satuan' => $item->satuan,
-                'Harga Beli Satuan (Rupiah)' => 0,
+                'Harga Beli Satuan (Rupiah)' => $hargaBeliSatuan,
                 'Total Persediaan Jumlah' => $stokPadaTanggal,
-                'Total Persediaan Harga Total (Rupiah)' => 0,
+                'Total Persediaan Harga Total (Rupiah)' => $stokPadaTanggal * $hargaBeliSatuan,
                 'Barang Rusak Jumlah' => 0,
                 'Barang Rusak Harga Total (Rupiah)' => 0,
                 'Barang Usang Jumlah' => 0,
@@ -186,9 +188,9 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->setCellValue('A14', '(1)');
         $sheet->setCellValue('B14', '(2)');
         $sheet->setCellValue('C14', '(3)');
-        $sheet->setCellValue('D14', '(4)');
+        $sheet->setCellValue('D14', '(4) = (6) / (5)');
         $sheet->setCellValue('E14', '(5)');
-        $sheet->setCellValue('F14', '(6) = (4) x (5)');
+        $sheet->setCellValue('F14', '(6)');
         $sheet->setCellValue('G14', '(7)');
         $sheet->setCellValue('H14', '(8) = (4) x (7)');
         $sheet->setCellValue('I14', '(9)');

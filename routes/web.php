@@ -127,6 +127,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/barang/all', [BarangController::class, 'BarangAll'])
             ->middleware('save_awal_bulan')
             ->name('barang.all');
+        Route::get('/get-kategori/{kelompok_id}', 'getKategori')->name('barang.get-kategori');
     });
         
     Route::controller(PilihanController::class)->group(function () {
