@@ -2,7 +2,7 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-sm-6">
-                 Copyright © 2024 BPS Kota Jakarta Utara. Developed by Fia & Shela.
+                 Copyright &copy; 2024 BPS Kota Jakarta Utara. Version 2 &copy; 2025
             </div>
             <div class="col-sm-6">
                 <div class="text-sm-end d-none d-sm-block">

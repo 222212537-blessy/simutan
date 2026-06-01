@@ -29,37 +29,84 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
     public function collection()
     {
         return $this->barang->map(function ($item, $key) {
-            $stokAwal = StokAwalBulan::where('barang_id', $item->id)
-                ->where('tahun', $this->tanggal->year)
-                ->where('bulan', $this->tanggal->month)
-                ->first();
+            // ---------------------------------------------------------------
+            // Kalkulasi stok HISTORIS pada tanggal yang dipilih
+            // Pendekatan: mundur dari stok SAAT INI di tabel barangs
+            //
+            // Rumus:
+            //   Stok(tgl X) = qty_item_sekarang
+            //                 + pengeluaran SETELAH tgl X  (sudah keluar, berarti dulu masih ada)
+            //                 - pemasukan   SETELAH tgl X  (belum masuk di tgl X)
+            //
+            // Ini lebih andal karena tidak bergantung pada stok_awal_bulans
+            // yang tidak selalu terisi setiap bulan.
+            // ---------------------------------------------------------------
 
-            $totalPemasukan = Pemasukan::where('barang_id', $item->id)
-                ->whereDate('tanggal', '<=', $this->tanggal)
+            $stokSaatIni = max(0, (int) $item->qty_item);
+
+            // Pemasukan yang terjadi SETELAH tanggal yang diminta
+            $pemasukanSetelah = Pemasukan::where('barang_id', $item->id)
+                ->whereDate('tanggal', '>', $this->tanggal)
                 ->sum('qty');
 
-            $totalPengeluaran = Pengeluaran::where('barang_id', $item->id)
-                ->whereDate('tanggal', '<=', $this->tanggal)
+            // Pengeluaran yang terjadi SETELAH tanggal yang diminta
+            $pengeluaranSetelah = Pengeluaran::where('barang_id', $item->id)
+                ->whereDate('tanggal', '>', $this->tanggal)
                 ->sum('qty');
 
-            $stokPadaTanggal = ($stokAwal ? $stokAwal->qty_awal : 0) + $totalPemasukan - $totalPengeluaran;
+            // Stok pada tanggal yang diminta — pastikan tidak negatif
+            $jumlah = max(0, $stokSaatIni + $pengeluaranSetelah - $pemasukanSetelah);
 
-            $hargaBeliSatuan = ($item->qty_item > 0) ? $item->harga_total / $item->qty_item : 0;
+            if ($jumlah == 0) {
+                // Jika stok habis pada tanggal tsb, kosongkan harga
+                $hargaBeliSatuan = 0;
+                $hargaTotal = 0;
+            } else {
+                // Harga satuan: gunakan dari barangs (qty_item & harga_total saat ini),
+                // hitung dengan akurasi desimal (tanpa pembulatan awal) agar akurat.
+                if ($item->qty_item > 0 && $item->harga_total > 0) {
+                    $hargaBeliSatuan = $item->harga_total / $item->qty_item;
+                } else {
+                    // Fallback: cari harga satuan dari stok_awal yang terdekat
+                    $stokAwalFallback = StokAwalBulan::where('barang_id', $item->id)
+                        ->where('harga_total', '>', 0)
+                        ->where('qty_awal', '>', 0)
+                        ->orderByDesc('tahun')
+                        ->orderByDesc('bulan')
+                        ->first();
+
+                    if ($stokAwalFallback) {
+                        $hargaBeliSatuan = $stokAwalFallback->harga_total / $stokAwalFallback->qty_awal;
+                    } else {
+                        $hargaBeliSatuan = 0;
+                    }
+                }
+
+                // Jika stok yang diminta SAMA dengan stok saat ini,
+                // gunakan persis nilai harga_total dari tabel barangs.
+                // Jika berbeda (karena tanggal historis), kalikan manual.
+                if ($jumlah == $stokSaatIni && $item->harga_total > 0) {
+                    $hargaTotal = $item->harga_total;
+                } else {
+                    $hargaTotal = max(0, round($jumlah * $hargaBeliSatuan));
+                }
+            }
 
             return [
-                'NO' => $key + 1,
-                'Uraian Barang' => $item->nama,
-                'Satuan' => $item->satuan,
-                'Harga Beli Satuan (Rupiah)' => $hargaBeliSatuan,
-                'Total Persediaan Jumlah' => $stokPadaTanggal,
-                'Total Persediaan Harga Total (Rupiah)' => $stokPadaTanggal * $hargaBeliSatuan,
-                'Barang Rusak Jumlah' => 0,
-                'Barang Rusak Harga Total (Rupiah)' => 0,
-                'Barang Usang Jumlah' => 0,
-                'Barang Usang Harga Total (Rupiah)' => 0,
+                'NO'                                    => $key + 1,
+                'Uraian Barang'                         => $item->nama,
+                'Satuan'                                => $item->satuan,
+                'Harga Beli Satuan (Rupiah)'            => $hargaBeliSatuan,
+                'Total Persediaan Jumlah'               => $jumlah,
+                'Total Persediaan Harga Total (Rupiah)' => $hargaTotal,
+                'Barang Rusak Jumlah'                   => 0,
+                'Barang Rusak Harga Total (Rupiah)'     => 0,
+                'Barang Usang Jumlah'                   => 0,
+                'Barang Usang Harga Total (Rupiah)'     => 0,
             ];
         });
     }
+
 
     private function convertNumberToWords($number)
     {
@@ -269,6 +316,14 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->getStyle("A$startingRow:A$dataEndRow")->getAlignment()->setHorizontal('center');
         $sheet->getStyle("C$startingRow:C$dataEndRow")->getAlignment()->setHorizontal('center');
     
+        // Format angka Indonesia: titik sebagai pemisah ribuan (sesuai regional setting Indonesia)
+        // #,##0 = bilangan bulat dengan pemisah ribuan, tanpa desimal
+        $sheet->getStyle("D$startingRow:D$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("E$startingRow:E$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("F$startingRow:F$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("H$startingRow:H$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("J$startingRow:J$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
+    
         // Set the row height for all data rows to 20
         for ($row = $startingRow; $row <= $dataEndRow; $row++) {
             $sheet->getRowDimension($row)->setRowHeight(30);
@@ -283,6 +338,12 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->setCellValue("F" . ($dataEndRow + 1), '=SUM(F' . $startingRow . ':F' . $dataEndRow . ')');
         $sheet->setCellValue("H" . ($dataEndRow + 1), '=SUM(H' . $startingRow . ':H' . $dataEndRow . ')');
         $sheet->setCellValue("J" . ($dataEndRow + 1), '=SUM(J' . $startingRow . ':J' . $dataEndRow . ')');
+    
+        // Format angka untuk baris Jumlah (total)
+        $sheet->getStyle("E" . ($dataEndRow + 1))->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("F" . ($dataEndRow + 1))->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("H" . ($dataEndRow + 1))->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("J" . ($dataEndRow + 1))->getNumberFormat()->setFormatCode('#,##0');
     
         $sheet->getStyle("A" . ($dataEndRow + 1) . ":J" . ($dataEndRow + 1))->applyFromArray([
             'font' => [
