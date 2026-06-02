@@ -80,18 +80,18 @@
 
                             <!-- Image Upload Field -->
                             <div class="row mb-3">
-                                <label for="image" class="col-sm-2 col-form-label">Upload Gambar</label>
+                                <label for="image" class="col-sm-2 col-form-label required">Upload Gambar</label>
                                 <div class="form-group col-sm-10">
-                                    <input name="image" class="form-control" type="file" id="image" accept="image/png">
+                                    <input name="image" class="form-control" type="file" id="image" accept="image/png" required>
                                     <small class="form-text text-muted">Ketentuan: File harus berupa PNG dan background telah di-remove.</small>
                                 </div>
                             </div>
 
                             <!-- Signature Upload Field -->
                             <div class="row mb-3">
-                                <label for="signature" class="col-sm-2 col-form-label">Upload Tanda Tangan</label>
+                                <label for="signature" class="col-sm-2 col-form-label required">Upload Tanda Tangan</label>
                                 <div class="form-group col-sm-10">
-                                    <input name="signature" class="form-control" type="file" id="signature" accept="image/png">
+                                    <input name="signature" class="form-control" type="file" id="signature" accept="image/png" required>
                                     <small class="form-text text-muted">Ketentuan: File harus berupa PNG.</small>
                                 </div>
                             </div>
@@ -124,6 +124,12 @@
                 },
                 role: {
                     required: true,
+                },
+                image: {
+                    required: true,
+                },
+                signature: {
+                    required: true,
                 }
             },
             messages: {
@@ -135,6 +141,12 @@
                 },
                 role: {
                     required: "Role harus dipilih.",
+                },
+                image: {
+                    required: "Gambar harus diupload.",
+                },
+                signature: {
+                    required: "Tanda tangan harus diupload.",
                 }
             },
             errorElement: 'span',

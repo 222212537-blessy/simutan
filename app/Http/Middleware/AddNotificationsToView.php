@@ -20,6 +20,15 @@ class AddNotificationsToView
     {
         if (Auth::check()) {
             $user = Auth::user();
+
+            // Cek stok barang secara berkala (setiap 1 jam) jika user adalah admin/supervisor
+            if (in_array($user->role, ['admin', 'supervisor'])) {
+                \Illuminate\Support\Facades\Cache::remember('stock_notification_checked', 3600, function () {
+                    app(\App\Http\Controllers\Pos\NotificationController::class)->checkStockAndNotify();
+                    return true;
+                });
+            }
+
             $unreadCount = Notification::where('user_id', $user->id)
                                     ->where('is_read', false)
                                     ->count();

@@ -524,8 +524,8 @@ class BarangController extends Controller
         $startDateFormatted = $startDate->translatedFormat('j F Y');
         $endDateFormatted = $endDate->translatedFormat('j F Y');
 
-        // Tentukan path file Excel yang akan diakses di storage/excel
-        $filePath = storage_path('app/excel/Laporan_Rincian_Persediaan.xlsx');
+        // Tentukan path file Excel yang akan diakses di resources/excel
+        $filePath = resource_path('excel/Laporan_Rincian_Persediaan.xlsx');
 
         // Pastikan file Excel benar-benar ada
         if (file_exists($filePath)) {

@@ -88,9 +88,14 @@
                                         <h5>{{ $period }}</h5>
                                         @foreach($groupedNotifications as $notification)
                                             @php
-                                                $url = route('permintaan.view', ['id' => $notification->permintaan_id]);
-                                                if (str_contains($notification->message, 'Terdapat permintaan baru')) {
-                                                    $url = route('permintaan.approve', ['id' => $notification->permintaan_id]);
+                                                if ($notification->permintaan_id) {
+                                                    $url = route('permintaan.view', ['id' => $notification->permintaan_id]);
+                                                    if (str_contains($notification->message, 'Terdapat permintaan baru')) {
+                                                        $url = route('permintaan.approve', ['id' => $notification->permintaan_id]);
+                                                    }
+                                                } else {
+                                                    // Jika tidak ada permintaan_id (misal: Notifikasi Sistem/Stok)
+                                                    $url = '#'; // Atau bisa diarahkan ke halaman daftar barang
                                                 }
                                             @endphp
                                             <div class="notification-item {{ $notification->is_read ? 'read' : 'unread' }}">

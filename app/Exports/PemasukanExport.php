@@ -63,18 +63,17 @@ class PemasukanExport
             foreach ($cellIterator as $cell) {
                 $rowData[] = $cell->getValue();
             }
-
-            // Ambil kode barang dari kolom B (index 1)
-            $kode = $rowData[1];
-
-            // Gabungkan kelompok kode dengan kode barang jika ada
+            // Ambil kode barang dari kolom B
+            $kode = $sheet->getCell('B' . $row->getRowIndex())->getValue();
             if ($kode) {
-                if (strlen($kode) == 10) {
-                    // Jika kode memiliki 10 digit, maka ini adalah kelompok_kode
-                    $kelompok_kode = $kode;
-                } elseif (strlen($kode) == 6 && isset($kelompok_kode)) {
+                $kodeStrTrimmed = trim((string)$kode);
+                
+                // Jika kode memiliki 10 digit, maka ini adalah kelompok_kode
+                if (strlen($kodeStrTrimmed) == 10) {
+                    $kelompok_kode = $kodeStrTrimmed;
+                } elseif (strlen($kodeStrTrimmed) == 6 && isset($kelompok_kode)) {
                     // Jika kode memiliki 6 digit, gabungkan dengan kelompok_kode
-                    $kode_barang_full = "{$kelompok_kode}{$kode}";
+                    $kode_barang_full = "{$kelompok_kode}{$kodeStrTrimmed}";
 
                     // Tambahkan kode barang penuh ke existingBarang
                     $existingBarang[] = $kode_barang_full;
@@ -83,45 +82,69 @@ class PemasukanExport
                     $barang = DB::table('barangs')->where('kode', $kode_barang_full)->first();
 
                     if ($barang) {
-                        // Hitung stok awal dan rupiah pada start_date
-                        $stokAwalData = DB::table('stok_awal_bulans')
+                        $stokSekarang = $barang->qty_item;
+
+                        // Pemasukan sejak start_date hingga sekarang (termasuk yang melebihi endDate)
+                        $pemasukanSetelahStartDate = DB::table('pemasukans')
                             ->where('barang_id', $barang->id)
-                            ->where('tahun', Carbon::parse($startDate)->year)
-                            ->where('bulan', Carbon::parse($startDate)->month)
-                            ->first();
+                            ->where('tanggal', '>=', $startDate)
+                            ->sum('qty');
 
-                        $stokAwal = $stokAwalData ? $stokAwalData->qty_awal : 0;
-                        $rupiahAwal = $stokAwalData ? $stokAwalData->harga_total : 0;
+                        // Pengeluaran sejak start_date hingga sekarang (termasuk yang melebihi endDate)
+                        $pengeluaranSetelahStartDate = DB::table('pengeluarans')
+                            ->where('barang_id', $barang->id)
+                            ->where('tanggal', '>=', $startDate)
+                            ->sum('qty');
 
+                        $stokSekarang = $barang->qty_item;
+
+                        // Harga Satuan dari stok saat ini
                         $hargaSatuan = 0;
-                        if ($stokAwal > 0) {
-                            $hargaSatuan = $rupiahAwal / $stokAwal;
-                        } elseif ($barang->qty_item > 0) {
+                        if ($barang->qty_item > 0) {
                             $hargaSatuan = $barang->harga_total / $barang->qty_item;
                         }
 
-                        // Hitung pemasukan di antara start_date dan endDate
+                        // 1. Hitung Stok Akhir (Nilai Tanggal Akhir)
+                        // Mundur dari stokSekarang, batalkan transaksi setelah endDate
+                        $pemasukanSetelahEndDate = DB::table('pemasukans')
+                            ->where('barang_id', $barang->id)
+                            ->where('tanggal', '>', $endDate)
+                            ->sum('qty');
+
+                        $pengeluaranSetelahEndDate = DB::table('pengeluarans')
+                            ->where('barang_id', $barang->id)
+                            ->where('tanggal', '>', $endDate)
+                            ->sum('qty');
+
+                        $stokAkhir = $stokSekarang - $pemasukanSetelahEndDate + $pengeluaranSetelahEndDate;
+                        if ($stokAkhir < 0) $stokAkhir = 0;
+                        $rupiahAkhir = $stokAkhir * $hargaSatuan;
+
+                        // 2. Hitung Mutasi
                         $totalPemasukan = DB::table('pemasukans')
                             ->where('barang_id', $barang->id)
                             ->whereBetween('tanggal', [$startDate, $endDate])
                             ->sum('qty');
 
-                        // Hitung pengeluaran di antara start_date dan endDate
                         $totalPengeluaran = DB::table('pengeluarans')
                             ->where('barang_id', $barang->id)
                             ->whereBetween('tanggal', [$startDate, $endDate])
                             ->sum('qty');
+                            
+                        $mutasiJumlah = $totalPemasukan - $totalPengeluaran;
 
-                        // Hitung stok akhir dan rupiah akhir
-                        $stokAkhir = $stokAwal + $totalPemasukan - $totalPengeluaran;
-                        $rupiahAkhir = $stokAkhir * $hargaSatuan;
+                        // 3. Hitung Stok Awal (Nilai Tanggal Mulai)
+                        // Mundur dari stokAkhir, batalkan mutasi selama periode
+                        $stokAwal = $stokAkhir - $totalPemasukan + $totalPengeluaran;
+                        if ($stokAwal < 0) $stokAwal = 0;
+                        $rupiahAwal = $stokAwal * $hargaSatuan;
 
                         // Set nilai baru ke dalam sheet Excel
                         $sheet->setCellValue('D' . $rowIndex, $stokAwal); // Stok awal pada kolom D
                         $sheet->setCellValue('E' . $rowIndex, $rupiahAwal); // Rupiah awal pada kolom E
                         $sheet->setCellValue('F' . $rowIndex, $totalPemasukan); // Pemasukan pada kolom F
                         $sheet->setCellValue('G' . $rowIndex, $totalPengeluaran); // Pengeluaran pada kolom G
-                        $sheet->setCellValue('H' . $rowIndex, "=F$rowIndex-G$rowIndex"); // Mutasi jumlah
+                        $sheet->setCellValue('H' . $rowIndex, $mutasiJumlah); // Mutasi jumlah
                         $sheet->setCellValue('I' . $rowIndex, $stokAkhir); // Stok akhir pada kolom I
                         $sheet->setCellValue('J' . $rowIndex, $rupiahAkhir); // Rupiah akhir pada kolom J
                     } else {
@@ -159,7 +182,7 @@ class PemasukanExport
     private function calculateCategorySums($sheet)
     {
         $kategoriRowIndex = null;
-        $sums = ['E' => 0, 'J' => 0];
+        $sums = ['D' => 0, 'E' => 0, 'F' => 0, 'G' => 0, 'H' => 0, 'I' => 0, 'J' => 0];
 
         $highestRow = $sheet->getHighestRow();
         for ($row = 12; $row <= $highestRow; $row++) {
@@ -173,14 +196,25 @@ class PemasukanExport
             }
 
             if ($kode) {
-                if (strlen($kode) == 10) {
+                $kodeStr = trim((string)$kode);
+                // Jika integer (misal 10 dari 000010), padding agar menjadi 6 digit
+                if (is_numeric($kodeStr) && strlen($kodeStr) < 6) {
+                    $kodeStr = str_pad($kodeStr, 6, '0', STR_PAD_LEFT);
+                }
+
+                if (strlen($kodeStr) == 10) {
                     if ($kategoriRowIndex !== null) {
                         $this->applyCategorySums($sheet, $kategoriRowIndex, $sums);
                     }
                     $kategoriRowIndex = $row;
-                    $sums = ['E' => 0, 'J' => 0];
-                } elseif (strlen($kode) == 6 && $kategoriRowIndex !== null) {
+                    $sums = ['D' => 0, 'E' => 0, 'F' => 0, 'G' => 0, 'H' => 0, 'I' => 0, 'J' => 0];
+                } elseif (strlen($kodeStr) == 6 && $kategoriRowIndex !== null) {
+                    $sums['D'] += (float)$sheet->getCell('D' . $row)->getCalculatedValue();
                     $sums['E'] += (float)$sheet->getCell('E' . $row)->getCalculatedValue();
+                    $sums['F'] += (float)$sheet->getCell('F' . $row)->getCalculatedValue();
+                    $sums['G'] += (float)$sheet->getCell('G' . $row)->getCalculatedValue();
+                    $sums['H'] += (float)$sheet->getCell('H' . $row)->getCalculatedValue();
+                    $sums['I'] += (float)$sheet->getCell('I' . $row)->getCalculatedValue();
                     $sums['J'] += (float)$sheet->getCell('J' . $row)->getCalculatedValue();
                 }
             }
@@ -189,11 +223,29 @@ class PemasukanExport
 
     private function applyCategorySums($sheet, $rowIndex, $sums)
     {
-        $sheet->setCellValue('E' . $rowIndex, $sums['E']);
-        $sheet->setCellValue('J' . $rowIndex, $sums['J']);
-        
-        $sheet->getStyle('E' . $rowIndex)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
-        $sheet->getStyle('J' . $rowIndex)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+        // Unmerge cells yang ada di baris kategori (bawaan dari template lama)
+        try {
+            $sheet->unmergeCells('D' . $rowIndex . ':E' . $rowIndex);
+        } catch (\Exception $e) { }
+        try {
+            $sheet->unmergeCells('F' . $rowIndex . ':H' . $rowIndex);
+        } catch (\Exception $e) { }
+        try {
+            $sheet->unmergeCells('I' . $rowIndex . ':J' . $rowIndex);
+        } catch (\Exception $e) { }
+
+        // Set nilai kosong untuk kolom yang tidak perlu ada isinya di baris kategori
+        $emptyColumns = ['D', 'F', 'G', 'H', 'I'];
+        foreach ($emptyColumns as $col) {
+            $sheet->setCellValue($col . $rowIndex, '');
+        }
+
+        // Set jumlah Rupiah untuk kolom Nilai Awal (E) dan Nilai Akhir (J)
+        $sumColumns = ['E', 'J'];
+        foreach ($sumColumns as $col) {
+            $sheet->setCellValue($col . $rowIndex, $sums[$col]);
+            $sheet->getStyle($col . $rowIndex)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+        }
     }
 
     private function createNewSheetWithExistingAndNewBarang($spreadsheet, $existingBarang, $startDate, $endDate)
@@ -238,72 +290,7 @@ class PemasukanExport
             }
         }
     
-        // Masukkan barang baru yang kelompok kodenya sudah ada
-        foreach ($barangBaru as $barang) {
-            $kelompokKode = substr($barang->kode, 0, 10); // Dapatkan 10 digit pertama sebagai kelompok kode
-    
-            if (isset($kelompokKodeBaris[$kelompokKode])) {
-                // Jika kelompok kode sudah ada, tambahkan barang baru di bawahnya
-                $barisKelompok = $kelompokKodeBaris[$kelompokKode] + 1;
-                $sheet->insertNewRowBefore($barisKelompok, 1);
-                $sheet->setCellValue('B' . $barisKelompok, substr($barang->kode, 10)); // Masukkan 6 digit terakhir sebagai kode barang
-                $sheet->setCellValue('C' . $barisKelompok, $barang->nama); // Masukkan nama barang
-    
-                // Hitung stok awal, pemasukan, pengeluaran, dan stok akhir
-                $stokAwalData = DB::table('stok_awal_bulans')
-                    ->where('barang_id', $barang->id)
-                    ->where('tahun', Carbon::parse($startDate)->year)
-                    ->where('bulan', Carbon::parse($startDate)->month)
-                    ->first();
-                
-                $stokAwal = $stokAwalData ? $stokAwalData->qty_awal : 0;
-                $rupiahAwal = $stokAwalData ? $stokAwalData->harga_total : 0;
-
-                $hargaSatuan = 0;
-                if ($stokAwal > 0) {
-                    $hargaSatuan = $rupiahAwal / $stokAwal;
-                } elseif ($barang->qty_item > 0) {
-                    $hargaSatuan = $barang->harga_total / $barang->qty_item;
-                }
-    
-                $totalPemasukan = DB::table('pemasukans')
-                    ->where('barang_id', $barang->id)
-                    ->whereBetween('tanggal', [$startDate, $endDate])
-                    ->sum('qty');
-    
-                $totalPengeluaran = DB::table('pengeluarans')
-                    ->where('barang_id', $barang->id)
-                    ->whereBetween('tanggal', [$startDate, $endDate])
-                    ->sum('qty');
-    
-                $stokAkhir = $stokAwal + $totalPemasukan - $totalPengeluaran;
-                $rupiahAkhir = $stokAkhir * $hargaSatuan;
-    
-                // Masukkan nilai stok awal, pemasukan, pengeluaran, dan stok akhir ke dalam sheet Excel
-                $sheet->setCellValue('D' . $barisKelompok, $stokAwal); // Stok awal pada kolom D
-                $sheet->setCellValue('E' . $barisKelompok, $rupiahAwal); // Rupiah awal pada kolom E
-                $sheet->setCellValue('F' . $barisKelompok, $totalPemasukan); // Pemasukan pada kolom F
-                $sheet->setCellValue('G' . $barisKelompok, $totalPengeluaran); // Pengeluaran pada kolom G
-                $sheet->setCellValue('H' . $barisKelompok, "=F$barisKelompok-G$barisKelompok"); // Mutasi jumlah
-                $sheet->setCellValue('I' . $barisKelompok, $stokAkhir); // Stok akhir pada kolom I
-                $sheet->setCellValue('J' . $barisKelompok, $rupiahAkhir); // Rupiah akhir pada kolom J
-    
-                // Tambahkan border tebal (thick) hanya pada outline (atas, bawah, kanan, kiri)
-                $sheet->getStyle('B' . $barisKelompok . ':J' . $barisKelompok)->applyFromArray([
-                    'borders' => [
-                        'top' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                        'bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                        'left' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                        'right' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                    ],
-                ]);
-    
-                // Perbarui posisi terakhir kelompok kode
-                $kelompokKodeBaris[$kelompokKode] = $barisKelompok;
-            }
-        }
-    
-        // Setelah semua barang yang sesuai kelompok kodenya ditambahkan, cari posisi terbaru dari baris "Jumlah"
+        // Cari posisi baris "Jumlah" terlebih dahulu
         $jumlahRow = null;
         for ($row = 581; $row <= $sheet->getHighestRow(); $row++) {
             $cellValue = $sheet->getCell('B' . $row)->getValue();
@@ -317,79 +304,20 @@ class PemasukanExport
         if ($jumlahRow === null) {
             throw new \Exception('Tidak dapat menemukan baris dengan nilai "jumlah" di kolom B.');
         }
-    
-        // Sisipkan kelompok kode baru dan barang-barang baru sebelum "Jumlah"
-        foreach ($barangBaru as $barang) {
-            $kelompokKode = substr($barang->kode, 0, 10); // Dapatkan 10 digit pertama sebagai kelompok kode
-    
-            if (!isset($kelompokKodeBaris[$kelompokKode])) {
-                // Tambahkan kelompok kode baru sebelum "Jumlah"
-                $sheet->insertNewRowBefore($jumlahRow, 1);
-                $sheet->setCellValue('B' . $jumlahRow, $kelompokKode); // Masukkan kelompok kode di kolom B
-                $sheet->setCellValue('C' . $jumlahRow, ''); // Kosongkan kolom C
-    
-                // Terapkan format warna biru pada kelompok kode
-                $sheet->getStyle('B' . $jumlahRow)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLUE);
-                $sheet->getStyle('B' . $jumlahRow)->getFont()->setBold(true); // Tambahkan tebal pada teks
-    
-                // Tambahkan border tebal (thick) hanya pada outline (atas, bawah, kanan, kiri)
-                $sheet->getStyle('B' . $jumlahRow . ':J' . $jumlahRow)->applyFromArray([
-                    'borders' => [
-                        'top' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                        'bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                        'left' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                        'right' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
-                    ],
-                ]);
-    
-                // Update jumlahRow agar barang berikutnya disisipkan di bawah kelompok kode ini
-                $jumlahRow++;
-    
-                // Masukkan barang baru di bawah kelompok kode baru
-                $sheet->insertNewRowBefore($jumlahRow, 1);
-                $sheet->setCellValue('B' . $jumlahRow, substr($barang->kode, 10)); // Masukkan 6 digit terakhir sebagai kode barang
-                $sheet->setCellValue('C' . $jumlahRow, $barang->nama); // Masukkan nama barang
-    
-                // Hitung stok awal, pemasukan, pengeluaran, dan stok akhir
-                $stokAwalData = DB::table('stok_awal_bulans')
-                    ->where('barang_id', $barang->id)
-                    ->where('tahun', Carbon::parse($startDate)->year)
-                    ->where('bulan', Carbon::parse($startDate)->month)
-                    ->first();
-                
-                $stokAwal = $stokAwalData ? $stokAwalData->qty_awal : 0;
-                $rupiahAwal = $stokAwalData ? $stokAwalData->harga_total : 0;
 
-                $hargaSatuan = 0;
-                if ($stokAwal > 0) {
-                    $hargaSatuan = $rupiahAwal / $stokAwal;
-                } elseif ($barang->qty_item > 0) {
-                    $hargaSatuan = $barang->harga_total / $barang->qty_item;
-                }
-    
-                $totalPemasukan = DB::table('pemasukans')
-                    ->where('barang_id', $barang->id)
-                    ->whereBetween('tanggal', [$startDate, $endDate])
-                    ->sum('qty');
-    
-                $totalPengeluaran = DB::table('pengeluarans')
-                    ->where('barang_id', $barang->id)
-                    ->whereBetween('tanggal', [$startDate, $endDate])
-                    ->sum('qty');
-    
-                $stokAkhir = $stokAwal + $totalPemasukan - $totalPengeluaran;
-                $rupiahAkhir = $stokAkhir * $hargaSatuan;
-    
-                // Masukkan nilai stok awal, pemasukan, pengeluaran, dan stok akhir ke dalam sheet Excel
-                $sheet->setCellValue('D' . $jumlahRow, $stokAwal); // Stok awal pada kolom D
-                $sheet->setCellValue('E' . $jumlahRow, $rupiahAwal); // Rupiah awal pada kolom E
-                $sheet->setCellValue('F' . $jumlahRow, $totalPemasukan); // Pemasukan pada kolom F
-                $sheet->setCellValue('G' . $jumlahRow, $totalPengeluaran); // Pengeluaran pada kolom G
-                $sheet->setCellValue('H' . $jumlahRow, "=F$jumlahRow-G$jumlahRow"); // Mutasi jumlah
-                $sheet->setCellValue('I' . $jumlahRow, $stokAkhir); // Stok akhir pada kolom I
-                $sheet->setCellValue('J' . $jumlahRow, $rupiahAkhir); // Rupiah akhir pada kolom J
-    
-                // Tambahkan border tebal (thick) hanya pada outline (atas, bawah, kanan, kiri)
+        // Iterasi barang baru
+        foreach ($barangBaru as $barang) {
+            $kelompokKode = substr($barang->kode, 0, 10);
+            
+            // Jika kategori ini belum ada, buat kategori barunya
+            if (!isset($kelompokKodeBaris[$kelompokKode])) {
+                $sheet->insertNewRowBefore($jumlahRow, 1);
+                $sheet->setCellValue('B' . $jumlahRow, $kelompokKode);
+                $sheet->setCellValue('C' . $jumlahRow, '');
+                
+                $sheet->getStyle('B' . $jumlahRow)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLUE);
+                $sheet->getStyle('B' . $jumlahRow)->getFont()->setBold(true);
+                
                 $sheet->getStyle('B' . $jumlahRow . ':J' . $jumlahRow)->applyFromArray([
                     'borders' => [
                         'top' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
@@ -398,7 +326,77 @@ class PemasukanExport
                         'right' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK],
                     ],
                 ]);
-                // Update jumlahRow agar barang berikutnya disisipkan di bawahnya
+                
+                // Simpan posisi baris kategori ini
+                $kelompokKodeBaris[$kelompokKode] = $jumlahRow;
+                
+                // Baris Jumlah terdorong turun 1
+                $jumlahRow++;
+            }
+            
+            // Sisipkan barang di baris setelah elemen terakhir kelompok kode ini
+            $barisBarang = $kelompokKodeBaris[$kelompokKode] + 1;
+            $sheet->insertNewRowBefore($barisBarang, 1);
+            
+            $sheet->setCellValue('B' . $barisBarang, substr($barang->kode, 10));
+            $sheet->setCellValue('C' . $barisBarang, $barang->nama);
+            
+            $stokSekarang = $barang->qty_item;
+            $hargaSatuan = 0;
+            if ($barang->qty_item > 0) {
+                $hargaSatuan = $barang->harga_total / $barang->qty_item;
+            }
+
+            // 1. Hitung Stok Akhir
+            $pemasukanSetelahEndDate = DB::table('pemasukans')->where('barang_id', $barang->id)->where('tanggal', '>', $endDate)->sum('qty');
+            $pengeluaranSetelahEndDate = DB::table('pengeluarans')->where('barang_id', $barang->id)->where('tanggal', '>', $endDate)->sum('qty');
+            $stokAkhir = $stokSekarang - $pemasukanSetelahEndDate + $pengeluaranSetelahEndDate;
+            if ($stokAkhir < 0) $stokAkhir = 0;
+            $rupiahAkhir = $stokAkhir * $hargaSatuan;
+
+            // 2. Hitung Mutasi
+            $totalPemasukan = DB::table('pemasukans')->where('barang_id', $barang->id)->whereBetween('tanggal', [$startDate, $endDate])->sum('qty');
+            $totalPengeluaran = DB::table('pengeluarans')->where('barang_id', $barang->id)->whereBetween('tanggal', [$startDate, $endDate])->sum('qty');
+            $mutasiJumlah = $totalPemasukan - $totalPengeluaran;
+
+            // 3. Hitung Stok Awal
+            $stokAwal = $stokAkhir - $totalPemasukan + $totalPengeluaran;
+            if ($stokAwal < 0) $stokAwal = 0;
+            $rupiahAwal = $stokAwal * $hargaSatuan;
+            
+            $sheet->setCellValue('D' . $barisBarang, $stokAwal);
+            $sheet->setCellValue('E' . $barisBarang, $rupiahAwal);
+            $sheet->setCellValue('F' . $barisBarang, $totalPemasukan);
+            $sheet->setCellValue('G' . $barisBarang, $totalPengeluaran);
+            $sheet->setCellValue('H' . $barisBarang, $mutasiJumlah);
+            $sheet->setCellValue('I' . $barisBarang, $stokAkhir);
+            $sheet->setCellValue('J' . $barisBarang, $rupiahAkhir);
+            
+            $sheet->getStyle('B' . $barisBarang . ':J' . $barisBarang)->applyFromArray([
+                'borders' => [
+                    'top' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN],
+                    'bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN],
+                    'left' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN],
+                    'right' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN],
+                ],
+                'font' => [
+                    'bold' => false,
+                    'color' => ['argb' => \PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK],
+                ]
+            ]);
+            
+            // Set rata kanan khusus untuk kolom angka (D sampai J)
+            $sheet->getStyle('D' . $barisBarang . ':J' . $barisBarang)->applyFromArray([
+                'alignment' => [
+                    'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT,
+                ]
+            ]);
+            
+            // Perbarui posisi baris terakhir kelompok kode ini
+            $kelompokKodeBaris[$kelompokKode] = $barisBarang;
+            
+            // Pastikan baris "Jumlah" terdorong jika baris yang disisipkan ada di atasnya
+            if ($barisBarang <= $jumlahRow) {
                 $jumlahRow++;
             }
         }

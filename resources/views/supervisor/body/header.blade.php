@@ -80,7 +80,7 @@
                 <h6 class="dropdown-header">Notifications</h6>
                 <div class="notification-list">
                     @forelse (session('notifications', []) as $notification)
-                        <a class="dropdown-item" href="{{ route('permintaan.approve', ['id' => $notification->permintaan_id]) }}">
+                        <a class="dropdown-item" href="{{ $notification->permintaan_id ? route('permintaan.approve', ['id' => $notification->permintaan_id]) : '#' }}">
                             <div class="d-flex align-items-center">
                                 <div class="me-3">
                                     <div class="avatar-sm">

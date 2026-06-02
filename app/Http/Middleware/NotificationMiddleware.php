@@ -20,6 +20,15 @@ class NotificationMiddleware
     {
         if (Auth::check()) {
             $user = Auth::user();
+
+            // Jalankan pengecekan stok barang sekali setiap 1 jam untuk admin/supervisor
+            if (in_array($user->role, ['admin', 'supervisor'])) {
+                \Illuminate\Support\Facades\Cache::remember('stock_notification_checked', 3600, function () {
+                    app(\App\Http\Controllers\Pos\NotificationController::class)->checkStockAndNotify();
+                    return true;
+                });
+            }
+
             $notifications = Notification::where('user_id', $user->id)
                                         ->orderBy('created_at', 'desc')
                                         ->limit(5)
