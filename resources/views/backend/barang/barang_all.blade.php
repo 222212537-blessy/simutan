@@ -145,6 +145,8 @@
         var userRole = "{{ auth()->user()->role }}";
     </script>
 
+    <script type="application/json" id="kelompok-filter-data">@json($kelompokFilt)</script>
+
     <script>
         $(document).ready(function() {
             // =================================================================
@@ -242,10 +244,13 @@
                             table.draw();
                         });
 
-                    @foreach ($kelompokFilt as $kelompok)
-                        kelompokSelect.append(
-                            '<option value="{{ $kelompok->id }}">{{ $kelompok->nama }}</option>');
-                    @endforeach
+                    const kelompokFilterData = JSON.parse($('#kelompok-filter-data').text());
+                    kelompokFilterData.forEach(function(kelompok) {
+                        kelompokSelect.append($('<option>', {
+                            value: kelompok.id,
+                            text: kelompok.nama
+                        }));
+                    });
 
                     if (userRole === 'admin') {
                         $('#exportDropdownContainer').html(`
@@ -347,7 +352,7 @@
                 };
 
                 $.ajax({
-                    url: '{{ route('barang.addStock') }}',
+                    url: "{{ route('barang.addStock') }}",
                     method: 'POST',
                     data: formData,
                     success: function(response) {

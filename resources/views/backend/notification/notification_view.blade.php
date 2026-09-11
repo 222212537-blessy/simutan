@@ -37,11 +37,16 @@
     }
     .btn-mark-read {
         text-decoration: none;
-        color: #28a745;
         font-weight: bold;
         display: flex;
         align-items: center;
         justify-content: center;
+    }
+    .btn-mark-read.read {
+        color: #28a745;
+    }
+    .btn-mark-read.unread {
+        color: #e1a017;
     }
 </style>
 
@@ -106,7 +111,7 @@
                                                     </a>
                                                 </div>
                                                 <div class="notification-actions">
-                                                    <a href="{{ route('notifications.markAsRead', $notification->id) }}" class="btn-mark-read" style="color: {{ $notification->is_read ? '#28a745' : '#e1a017' }};">
+                                                    <a href="{{ route('notifications.markAsRead', $notification->id) }}" class="btn-mark-read {{ $notification->is_read ? 'read' : 'unread' }}">
                                                         <i class="{{ $notification->is_read ? 'ti ti-check text-success' : 'ti ti-check' }}"></i> {{ $notification->is_read ? 'Dibaca' : 'Tandai dibaca' }}
                                                     </a>
                                                 </div>

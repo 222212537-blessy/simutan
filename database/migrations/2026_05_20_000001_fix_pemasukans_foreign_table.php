@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -13,18 +14,32 @@ return new class extends Migration
      */
     public function up()
     {
-        // Drop incorrect foreign key if exists and recreate it to reference `barangs`
-        Schema::table('pemasukans', function (Blueprint $table) {
-            // Use column-based drop to be resilient to FK naming
-            try {
-                $table->dropForeign(['barang_id']);
-            } catch (\Exception $e) {
-                // ignore if it does not exist
-            }
+        $databaseName = DB::getDatabaseName();
+        $foreignKeys = DB::table('information_schema.KEY_COLUMN_USAGE')
+            ->where('TABLE_SCHEMA', $databaseName)
+            ->where('TABLE_NAME', 'pemasukans')
+            ->where('COLUMN_NAME', 'barang_id')
+            ->whereNotNull('CONSTRAINT_NAME')
+            ->where('CONSTRAINT_NAME', '<>', 'PRIMARY')
+            ->pluck('CONSTRAINT_NAME')
+            ->unique();
 
-            // Recreate correct foreign key referencing `barangs` table
-            $table->foreign('barang_id')->references('id')->on('barangs')->onDelete('cascade');
-        });
+        foreach ($foreignKeys as $foreignKey) {
+            DB::statement('ALTER TABLE `pemasukans` DROP FOREIGN KEY `' . str_replace('`', '``', $foreignKey) . '`');
+        }
+
+        $hasCorrectForeignKey = DB::table('information_schema.KEY_COLUMN_USAGE')
+            ->where('TABLE_SCHEMA', $databaseName)
+            ->where('TABLE_NAME', 'pemasukans')
+            ->where('COLUMN_NAME', 'barang_id')
+            ->where('REFERENCED_TABLE_NAME', 'barangs')
+            ->exists();
+
+        if (!$hasCorrectForeignKey) {
+            Schema::table('pemasukans', function (Blueprint $table) {
+                $table->foreign('barang_id')->references('id')->on('barangs')->onDelete('cascade');
+            });
+        }
     }
 
     /**

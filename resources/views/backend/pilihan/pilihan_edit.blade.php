@@ -268,25 +268,15 @@
     </div>
 </div>
 
+<div id="cart-data" data-items="{{ $cartAwalJson ?? '' }}"></div>
+
 <script type="text/javascript">
 $(document).ready(function() {
     let masterBarang = [];
     let masterKategori = [];
 
-    // KUNCI SINKRONISASI EDIT: Masukkan seluruh daftar item lama ke array javascript keranjang belanja
-    let cart = [
-        @if(isset($pilihanBarangLama))
-            @foreach($pilihanBarangLama as $itemLama)
-            {
-                id: parseInt("{{ $itemLama->barang_id }}"),
-                barang_nama: "{!! optional($barang->find($itemLama->barang_id))->nama ?? 'Barang Tanpa Nama' !!}",
-                kelompok_nama: "{{ optional($barang->find($itemLama->barang_id))->kelompok->nama ?? 'Barang Konsumsi' }}",
-                qty_req: parseInt("{{ $itemLama->req_qty }}"),
-                barang_satuan: "{{ optional($barang->find($itemLama->barang_id))->satuan ?? 'Buah' }}"
-            },
-            @endforeach
-        @endif
-    ];
+    const cartData = document.getElementById('cart-data').dataset.items;
+    let cart = cartData ? JSON.parse(atob(cartData)) : [];
 
     // Mengembalikan catatan deskripsi lama ke textarea
     $('#textarea').val(`{{ $pilihan->description }}`);

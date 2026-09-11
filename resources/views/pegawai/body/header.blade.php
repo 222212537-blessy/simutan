@@ -39,7 +39,13 @@
                     <h6 class="dropdown-header">Notifications</h6>
                     <div class="notification-list">
                         @forelse (session('notifications', []) as $notification)
-                            <a class="dropdown-item" href="{{ $notification->permintaan_id ? route('permintaan.approve', ['id' => $notification->permintaan_id]) : '#' }}">
+                            @php
+                                $notificationUrl = route('barang.all');
+                                if ($notification->permintaan_id) {
+                                    $notificationUrl = route('permintaan.approve', ['id' => $notification->permintaan_id]);
+                                }
+                            @endphp
+                            <a class="dropdown-item" href="{{ $notificationUrl }}">
                                 <div class="d-flex align-items-center">
                                     <div class="me-3">
                                         <div class="avatar-sm">
@@ -72,6 +78,10 @@
             @php
             $id = Auth::user()->id;
             $adminData = App\Models\User::find($id);
+            $profileImage = $adminData->foto ?? $adminData->profile_image ?? null;
+            $profileImageUrl = $profileImage
+                ? (str_contains($profileImage, '/') ? asset(ltrim($profileImage, '/')) : asset('upload/admin_images/' . $profileImage))
+                : asset('upload/no_image.jpg');
             @endphp
 
             <div class="dropdown d-inline-block user-dropdown">
@@ -82,13 +92,12 @@
                     @if(Auth::user()->id == 1)
                         <img class="rounded-circle header-profile-user" 
                             style="object-fit: cover; object-position: center top 10%;" 
-                            src="{{ !empty($adminData->foto) ? url($adminData->foto) : url('upload/no_image.jpg') }}"
+                            src="{{ $profileImageUrl }}"
                             alt="Header Avatar">
                     @else
                         <img class="rounded-circle header-profile-user" 
-                            style="object-fit: cover; 
-                            {{ Auth::user()->id == 1 ? 'object-position: top center; transform: translateY(-10px);' : 'object-position: top center;' }}" 
-                            src="{{ !empty($adminData->foto) ? url($adminData->foto) : url('upload/no_image.jpg') }}"
+                            style="object-fit: cover; object-position: top center;" 
+                            src="{{ $profileImageUrl }}"
                             alt="Header Avatar">
                     @endif
                     
@@ -140,11 +149,14 @@
     }
 </style>
 
+<meta id="notification-config" data-mark-all-read-url="{{ route('notifications.markAllRead') }}" data-csrf-token="{{ csrf_token() }}">
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const notificationDropdown = document.getElementById('notification-dropdown');
+        const notificationConfig = document.getElementById('notification-config');
         notificationDropdown.addEventListener('click', function () {
-            fetch('{{ route('notifications.markAllRead') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+            fetch(notificationConfig.dataset.markAllReadUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': notificationConfig.dataset.csrfToken } });
         });
     });
 </script>

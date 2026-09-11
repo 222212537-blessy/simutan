@@ -292,7 +292,7 @@ class PemasukanExport
     
         // Cari posisi baris "Jumlah" terlebih dahulu
         $jumlahRow = null;
-        for ($row = 581; $row <= $sheet->getHighestRow(); $row++) {
+        for ($row = 12; $row <= $sheet->getHighestRow(); $row++) {
             $cellValue = $sheet->getCell('B' . $row)->getValue();
             if (strtolower(trim($cellValue)) == 'jumlah') {
                 $jumlahRow = $row;

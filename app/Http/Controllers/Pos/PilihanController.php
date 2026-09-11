@@ -257,9 +257,21 @@ class PilihanController extends Controller
         
         $barang = Barang::all();
         $kelompok = Kelompok::all();
+        $cartAwal = $pilihanBarangLama->map(function ($itemLama) use ($barang) {
+            $itemBarang = $barang->find($itemLama->barang_id);
+
+            return [
+                'id' => (int) $itemLama->barang_id,
+                'barang_nama' => optional($itemBarang)->nama ?? 'Barang Tanpa Nama',
+                'kelompok_nama' => optional(optional($itemBarang)->kelompok)->nama ?? 'Barang Konsumsi',
+                'qty_req' => (int) $itemLama->req_qty,
+                'barang_satuan' => optional($itemBarang)->satuan ?? 'Buah',
+            ];
+        })->values();
+        $cartAwalJson = base64_encode(json_encode($cartAwal));
         
         // 3. Kirim data ke view edit
-        return view('backend.pilihan.pilihan_edit', compact('pilihan', 'pilihanBarangLama', 'barang', 'kelompok'));
+        return view('backend.pilihan.pilihan_edit', compact('pilihan', 'pilihanBarangLama', 'barang', 'kelompok', 'cartAwalJson'));
     }
 
     public function PilihanUpdate(Request $request, $id)
@@ -390,6 +402,14 @@ class PilihanController extends Controller
 
         $barang = $query->select('id', 'nama', 'qty_item', 'satuan', 'kelompok_id', 'kategori_id', 'foto_barang')
                         ->get();
+
+        $barang->transform(function ($item) {
+            $item->foto_url = $item->foto_barang
+                ? asset($item->foto_barang)
+                : asset('backend/assets/images/barang/default_atk.png');
+
+            return $item;
+        });
 
         $kategoris = Kategori::select('id', 'kelompok_id', 'nama')->get();
 
