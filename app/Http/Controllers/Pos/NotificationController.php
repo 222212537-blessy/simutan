@@ -36,10 +36,12 @@ class NotificationController extends Controller
                 ->selectRaw('COUNT(DISTINCT QUARTER(tanggal)) as quarter_count')
                 ->value('quarter_count');
 
+            $stockNotificationPrefix = "Stok barang {$barang->nama} diprediksi akan habis";
+
             if ($averageQuarterlyUsage > 0 && $quarterCount >= 4 && $barang->qty_item > 0) {
                 $avgRounded = round($averageQuarterlyUsage);
 
-                if ($averageQuarterlyUsage < 5) {
+                if ($averageQuarterlyUsage >= 5) {
                     $category = 'sering dipakai';
                     $shouldNotify = $barang->qty_item < 5;
                     $thresholdText = 'Batas kritis: < 5 unit';
@@ -51,6 +53,12 @@ class NotificationController extends Controller
 
                 if ($shouldNotify) {
                     $message = "Stok barang {$barang->nama} diprediksi akan habis (Sisa stok: {$barang->qty_item}, Rata-rata pengeluaran 4 kuartal tahun lalu: {$avgRounded}, Kategori: {$category}, {$thresholdText}). Perlu penambahan atau pengadaan stok barang.";
+
+                    Notification::whereIn('user_id', $usersToNotify->pluck('id'))
+                        ->where('message', 'like', $stockNotificationPrefix . '%')
+                        ->where('message', '!=', $message)
+                        ->where('is_read', false)
+                        ->delete();
 
                     foreach ($usersToNotify as $user) {
                         $existingNotification = Notification::where('user_id', $user->id)
@@ -67,7 +75,17 @@ class NotificationController extends Controller
                             ]);
                         }
                     }
+                } else {
+                    Notification::whereIn('user_id', $usersToNotify->pluck('id'))
+                        ->where('message', 'like', $stockNotificationPrefix . '%')
+                        ->where('is_read', false)
+                        ->delete();
                 }
+            } else {
+                Notification::whereIn('user_id', $usersToNotify->pluck('id'))
+                    ->where('message', 'like', $stockNotificationPrefix . '%')
+                    ->where('is_read', false)
+                    ->delete();
             }
         }
     }

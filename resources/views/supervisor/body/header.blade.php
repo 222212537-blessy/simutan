@@ -76,7 +76,7 @@
                 <i class="ri-notification-3-line"></i>
                 <span class="badge bg-danger">{{ session('unreadCount', 0) }}</span>
             </button>
-            <div class="dropdown-menu dropdown-menu-end">
+            <div class="dropdown-menu dropdown-menu-end notification-menu">
                 <h6 class="dropdown-header">Notifications</h6>
                 <div class="notification-list">
                     @forelse (session('notifications', []) as $notification)
@@ -169,7 +169,10 @@
 <!-- Styles for Notification Dropdown -->
 <style>
     .notification-menu {
-        width: 500px; /* Atur lebar notifikasi menjadi 500px */
+        width: 500px;
+        max-width: calc(100vw - 30px);
+        max-height: 400px;
+        overflow-y: auto;
     }
 
     .notification-list a {
@@ -178,6 +181,16 @@
         padding: 10px;
         text-decoration: none;
         color: inherit;
+    }
+
+    .notification-list .flex-1 {
+        min-width: 0;
+    }
+
+    .notification-list h6 {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
 
     .notification-list a:hover {
