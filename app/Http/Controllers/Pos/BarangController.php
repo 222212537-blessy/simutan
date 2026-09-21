@@ -9,7 +9,7 @@ use App\Models\Kategori;
 use App\Models\Pemasukan;
 use App\Models\Barang;
 use App\Models\StokAwalBulan;
-use Auth;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Carbon;
 use Yajra\DataTables\DataTables;
 use App\Exports\BarangExport;
@@ -510,7 +510,7 @@ class BarangController extends Controller
         $filename = "BA Stock Opname {$formattedDate}.xlsx";
 
         // Kirim data barang dan tanggal ke BarangExport
-        return Excel::download(new BarangExport($barang, $tanggal), $filename);
+        return Excel::download(new BarangExport($barang, $tanggal, Auth::user()), $filename);
     }
 
 

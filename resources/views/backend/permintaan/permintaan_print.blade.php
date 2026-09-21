@@ -182,22 +182,49 @@
                                 <td class="signature">
                                     <br>
                                     <p>Yang Menyerahkan</p>
-                                    <img src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('backend/assets/images/users/ttd_4.png'))) }}" alt="Signature Juniaty Pardede">
-                                    <div class="name">Juniaty Pardede, A.Md</div>
+                                    @if($admin)
+                                        @php
+                                            $adminSignature = public_path('backend/assets/images/users/ttd_' . $admin->id . '.png');
+                                        @endphp
+                                        @if(is_file($adminSignature))
+                                            <img src="data:image/png;base64,{{ base64_encode(file_get_contents($adminSignature)) }}" alt="Signature {{ $admin->name }}">
+                                        @else
+                                            <div class="signature-placeholder"><br><br><br></div>
+                                        @endif
+                                        <div class="name">{{ $admin->name }}</div>
+                                    @endif
                                 </td>
                                 <td class="signature">
                                     <br>
                                     <p>Yang Menerima</p>
-                                    <img src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('backend/assets/images/users/ttd_' . $pilihan->first()->permintaan->user->id . '.png'))) }}" alt="Signature {{ auth()->user()->name }}">
-                                    <div class="name">{{ $pilihan->first()->created_by }}</div>
+                                    @if($permintaan->user)
+                                        @php
+                                            $userSignature = public_path('backend/assets/images/users/ttd_' . $permintaan->user->id . '.png');
+                                        @endphp
+                                        @if(is_file($userSignature))
+                                            <img src="data:image/png;base64,{{ base64_encode(file_get_contents($userSignature)) }}" alt="Signature {{ $permintaan->user->name }}">
+                                        @else
+                                            <div class="signature-placeholder"><br><br><br></div>
+                                        @endif
+                                        <div class="name">{{ $permintaan->user->name }}</div>
+                                    @endif
                                 </td>
                                 <td class="signature">
                                     <div class="date-location" style="text-align: center; font-size: 11px">
                                         Jakarta, {{ \Carbon\Carbon::parse($pilihan->first()->date)->locale('id')->translatedFormat('d F Y') }}
                                     </div>
                                     <p>Mengetahui/Menyetujui</p>
-                                    <img src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('backend/assets/images/users/ttd_2.png'))) }}" alt="Signature Mohamad Rudiansyah Oktavan">
-                                    <div class="name">Mohamad Rudiansyah Oktavan, S.E.</div>
+                                    @if($supervisor)
+                                        @php
+                                            $supervisorSignature = public_path('backend/assets/images/users/ttd_' . $supervisor->id . '.png');
+                                        @endphp
+                                        @if(is_file($supervisorSignature))
+                                            <img src="data:image/png;base64,{{ base64_encode(file_get_contents($supervisorSignature)) }}" alt="Signature {{ $supervisor->name }}">
+                                        @else
+                                            <div class="signature-placeholder"><br><br><br></div>
+                                        @endif
+                                        <div class="name">{{ $supervisor->name }}</div>
+                                    @endif
                                 </td>
                             </tr>
                         </table>

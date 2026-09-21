@@ -42,39 +42,55 @@
                 <div class="card">
                     <div class="card-body">
                         <h4 class="card-title">Tambah Pengguna</h4><br>
+
+                        @if ($errors->any())
+                            <div class="alert alert-danger" role="alert">
+                                <strong>Pengguna gagal ditambahkan.</strong>
+                                <ul class="mb-0 mt-2">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
                         <form method="post" action="{{ route('user.store') }}" id="myForm" enctype="multipart/form-data">
                             @csrf
 
                             <div class="row mb-3">
                                 <label for="name" class="col-sm-2 col-form-label required">Nama Pengguna</label>
                                 <div class="form-group col-sm-10">
-                                    <input name="name" class="form-control" type="text" id="name" required>
+                                    <input name="name" class="form-control @error('name') is-invalid @enderror" type="text" id="name" value="{{ old('name') }}" required>
+                                    @error('name') <span class="invalid-feedback">{{ $message }}</span> @enderror
                                 </div>
                             </div>
 
                             <div class="row mb-3">
                                 <label for="panggilan" class="col-sm-2 col-form-label required">Nama Panggilan</label>
                                 <div class="form-group col-sm-10">
-                                    <input name="panggilan" class="form-control" type="text" id="panggilan" required>
+                                    <input name="panggilan" class="form-control @error('panggilan') is-invalid @enderror" type="text" id="panggilan" value="{{ old('panggilan') }}" required>
+                                    @error('panggilan') <span class="invalid-feedback">{{ $message }}</span> @enderror
                                 </div>
                             </div>
                         
                             <div class="row mb-3">
                                 <label for="username" class="col-sm-2 col-form-label required">Username</label>
                                 <div class="form-group col-sm-10">
-                                    <input name="username" class="form-control" type="text" id="username" required>
+                                    <input name="username" class="form-control @error('username') is-invalid @enderror" type="text" id="username" value="{{ old('username') }}" required>
+                                    @error('username') <span class="invalid-feedback">{{ $message }}</span> @enderror
                                 </div>
                             </div>
                         
                             <div class="row mb-3">
                                 <label for="role" class="col-sm-2 col-form-label required">Role</label>
                                 <div class="col-sm-10">
-                                    <select name="role" class="form-select" aria-label="Default select example" id="role" required>
-                                        <option value="" selected disabled>Pilih role untuk User</option>
-                                        <option value="admin">Admin</option>
-                                        <option value="supervisor">Supervisor</option>
-                                        <option value="pegawai">Pegawai</option>
+                                    <select name="role" class="form-select @error('role') is-invalid @enderror" aria-label="Default select example" id="role" required>
+                                        <option value="" disabled {{ old('role') ? '' : 'selected' }}>Pilih role untuk User</option>
+                                        <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin</option>
+                                        <option value="supervisor" {{ old('role') === 'supervisor' ? 'selected' : '' }}>Supervisor</option>
+                                        <option value="pegawai" {{ old('role') === 'pegawai' ? 'selected' : '' }}>Pegawai</option>
                                     </select>
+                                    @error('role') <span class="invalid-feedback">{{ $message }}</span> @enderror
                                 </div>
                             </div>
 
@@ -82,8 +98,9 @@
                             <div class="row mb-3">
                                 <label for="image" class="col-sm-2 col-form-label required">Upload Gambar</label>
                                 <div class="form-group col-sm-10">
-                                    <input name="image" class="form-control" type="file" id="image" accept="image/png" required>
+                                    <input name="image" class="form-control @error('image') is-invalid @enderror" type="file" id="image" accept="image/png" required>
                                     <small class="form-text text-muted">Ketentuan: File harus berupa PNG dan background telah di-remove.</small>
+                                    @error('image') <span class="invalid-feedback d-block">{{ $message }}</span> @enderror
                                 </div>
                             </div>
 
@@ -91,8 +108,9 @@
                             <div class="row mb-3">
                                 <label for="signature" class="col-sm-2 col-form-label required">Upload Tanda Tangan</label>
                                 <div class="form-group col-sm-10">
-                                    <input name="signature" class="form-control" type="file" id="signature" accept="image/png" required>
+                                    <input name="signature" class="form-control @error('signature') is-invalid @enderror" type="file" id="signature" accept="image/png" required>
                                     <small class="form-text text-muted">Ketentuan: File harus berupa PNG.</small>
+                                    @error('signature') <span class="invalid-feedback d-block">{{ $message }}</span> @enderror
                                 </div>
                             </div>
 

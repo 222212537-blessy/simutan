@@ -614,9 +614,11 @@ class PermintaanController extends Controller
         // Ambil data permintaan dan pilihan
         $permintaan = Permintaan::findOrFail($id);
         $pilihan = Pilihan::where('permintaan_id', $id)->get();
+        $admin = User::where('role', 'admin')->first();
+        $supervisor = User::where('role', 'supervisor')->first();
 
         // Load view sebagai HTML
-        $view = view('backend.permintaan.permintaan_print', compact('permintaan', 'pilihan'))->render();
+        $view = view('backend.permintaan.permintaan_print', compact('permintaan', 'pilihan', 'admin', 'supervisor'))->render();
 
         // Inisialisasi Dompdf
         $options = new Options();

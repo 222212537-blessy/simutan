@@ -82,7 +82,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/user/store', 'UserStore')->name('user.store');
         Route::get('/user/edit/{id}', 'UserEdit')->name('user.edit');
         Route::put('/user/update/{id}', 'UserUpdate')->name('user.update');
-        Route::get('/user/delete/{id}', 'UserDelete')->name('user.delete');
+        Route::post('/user/delete/{id}', 'UserDelete')->name('user.delete');
     });
 
     Route::controller(PermintaanController::class)->group(function () {

@@ -406,7 +406,7 @@ class PilihanController extends Controller
         $barang->transform(function ($item) {
             $item->foto_url = $item->foto_barang
                 ? asset($item->foto_barang)
-                : asset('backend/assets/images/barang/default_atk.png');
+                : asset('upload/no_image.jpg');
 
             return $item;
         });

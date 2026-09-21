@@ -41,12 +41,12 @@ class UserController extends Controller
     // Fetch distinct roles from the users table for filtering options
     $roles = User::select('role')->distinct()->get();
 
-    return view('backend.user.user_all', compact('roles'));
+    return view('backend.User.user_all', compact('roles'));
 }
 
 
     public function UserAdd(){
-        return view('backend.user.user_add');
+        return view('backend.User.user_add');
     } // End Method
 
     public function UserStore(Request $request)
@@ -57,8 +57,8 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users',
             'panggilan' => 'required|string|max:255',
             'role' => 'required|in:admin,supervisor,pegawai',
-            'image' => 'nullable|image|mimes:png|max:2048',
-            'signature' => 'nullable|image|mimes:png|max:2048',
+            'image' => 'required|image|mimes:png|max:2048',
+            'signature' => 'required|image|mimes:png|max:2048',
         ]);
     
         // Simpan user tanpa path file terlebih dahulu untuk mendapatkan ID user
@@ -108,7 +108,7 @@ class UserController extends Controller
     
     public function UserEdit($id){
         $user = User::findOrFail($id);
-        return view('backend.user.user_edit', compact('user'));
+        return view('backend.User.user_edit', compact('user'));
     }
 
     public function UserUpdate(Request $request, $id)
@@ -203,8 +203,14 @@ public function UpdateProfile(Request $request, $id)
 }
 
 
-    public function UserDelete($id){
-        user::findOrFail($id)->delete();
+    public function UserDelete($id)
+    {
+        $user = User::findOrFail($id);
+        $user->delete();
+
+        if (request()->ajax()) {
+            return response()->json(['message' => 'Data pengguna berhasil dihapus.']);
+        }
 
         $notification = array(
             'message' => 'Pengguna berhasil dihapus',

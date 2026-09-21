@@ -8,73 +8,73 @@
 </head>
 
 <style>
-/* Mengatur elemen pencarian dan dropdown filter */
-#datatable_filter {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+    /* Mengatur elemen pencarian dan dropdown filter */
+    #datatable_filter {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
 
-.dataTables_filter {
-    margin-left: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: end;
-}
+    .dataTables_filter {
+        margin-left: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: end;
+    }
 
-#roleFilter {
-    width: 20%; /* Atur lebar dropdown sesuai kebutuhan */
-}
+    #roleFilter {
+        width: 20%; /* Atur lebar dropdown sesuai kebutuhan */
+    }
 
-/* Atur kotak pencarian agar berada di sebelah kanan dropdown filter */
-.dataTables_filter input {
-    margin-left: 10px; /* Memberi jarak antara dropdown dan kotak pencarian */
-}
+    /* Atur kotak pencarian agar berada di sebelah kanan dropdown filter */
+    .dataTables_filter input {
+        margin-left: 10px; /* Memberi jarak antara dropdown dan kotak pencarian */
+    }
 
-/* Styling untuk tombol ekspor */
-.dt-button-collection .dropdown-toggle {
-    display: block !important;
-    width: 100% !important;
-    padding: .47rem 1.75rem .47rem .75rem !important;
-    -moz-padding-start: calc(.75rem - 3px) !important;
-    font-size: .9rem !important;
-    font-weight: 500 !important;
-    line-height: 1.5 !important;
-    color: #505d69 !important;
-    background-color: #fff !important;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%230a1832' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
-    background-repeat: no-repeat !important;
-    background-position: right .75rem center !important;
-    background-size: 16px 12px !important;
-    border: 1px solid #ced4da !important;
-    border-radius: .25rem !important;
-    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out !important;
-    appearance: none !important;
-}
+    /* Styling untuk tombol ekspor */
+    .dt-button-collection .dropdown-toggle {
+        display: block !important;
+        width: 100% !important;
+        padding: .47rem 1.75rem .47rem .75rem !important;
+        -moz-padding-start: calc(.75rem - 3px) !important;
+        font-size: .9rem !important;
+        font-weight: 500 !important;
+        line-height: 1.5 !important;
+        color: #505d69 !important;
+        background-color: #fff !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%230a1832' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right .75rem center !important;
+        background-size: 16px 12px !important;
+        border: 1px solid #ced4da !important;
+        border-radius: .25rem !important;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out !important;
+        appearance: none !important;
+    }
 
-.dt-button-collection .dropdown-menu {
-    border: 1px solid #ced4da !important;
-    border-radius: .25rem !important;
-    box-shadow: 0 0 0 .15rem rgba(15,156,243,.25) !important;
-    background-color: #fff !important;
-}
+    .dt-button-collection .dropdown-menu {
+        border: 1px solid #ced4da !important;
+        border-radius: .25rem !important;
+        box-shadow: 0 0 0 .15rem rgba(15,156,243,.25) !important;
+        background-color: #fff !important;
+    }
 
-.dt-button-collection .dropdown-item {
-    color: #505d69 !important;
-    padding: .5rem 1rem !important;
-    text-decoration: none !important;
-}
+    .dt-button-collection .dropdown-item {
+        color: #505d69 !important;
+        padding: .5rem 1rem !important;
+        text-decoration: none !important;
+    }
 
-.dt-button-collection .dropdown-item:hover {
-    background-color: #f8f9fa !important;
-}
+    .dt-button-collection .dropdown-item:hover {
+        background-color: #f8f9fa !important;
+    }
 
-.dt-button-collection .dropdown-item:focus {
-    outline: none !important;
-    background-color: #e9ecef !important;
-}
+    .dt-button-collection .dropdown-item:focus {
+        outline: none !important;
+        background-color: #e9ecef !important;
+    }
 
-.filter-buttons {
+    .filter-buttons {
         display: flex;
         align-items: center;
     }
@@ -196,6 +196,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script type="text/javascript">
     $(document).ready(function() {
@@ -235,7 +236,7 @@
                             <a href="${editUrl}" class="btn btn-sm hover:bg-warning" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: #e1a017; padding: 15px;" data-tooltip="Edit Pegawai">
                                 <i class="ti ti-edit font-size-20 align-middle"></i>
                             </a>
-                            <a href="${deleteUrl}" class="btn btn-sm text-danger hover:bg-danger" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: red; padding: 15px;" data-tooltip="Hapus Pegawai">
+                            <a href="${deleteUrl}" class="btn btn-sm text-danger hover:bg-danger delete-btn" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: red; padding: 15px;" data-tooltip="Hapus Pegawai">
                                 <i class="ti ti-trash font-size-20 align-middle text-danger"></i>
                             </a>
                         </div>
@@ -243,52 +244,8 @@
                     }
                 },
             ],
-            // dom: 'Brftip',
-            // buttons: [
-            //     {
-            //         extend: 'collection',
-            //         text: 'Export &nbsp',
-            //         className: 'form-select',
-            //         buttons: [
-            //             {
-            //                 extend: 'excelHtml5',
-            //                 text: 'Export Excel',
-            //                 title: 'Data Export',
-            //                 exportOptions: {
-            //                     columns: ':not(.no-export)' // Eksklusi kolom dengan kelas 'no-export'
-            //                 },
-            //             },
-            //             {
-            //                 extend: 'copy',
-            //                 text: 'Copy',
-            //                 exportOptions: {
-            //                     columns: ':not(.no-export)' // Eksklusi kolom dengan kelas 'no-export'
-            //                 },
-            //             },
-            //             {
-            //                 extend: 'csv',
-            //                 text: 'CSV',
-            //                 exportOptions: {
-            //                     columns: ':not(.no-export)' // Eksklusi kolom dengan kelas 'no-export'
-            //                 },
-            //             },
-            //             {
-            //                 extend: 'pdf',
-            //                 text: 'PDF',
-            //                 exportOptions: {
-            //                     columns: ':not(.no-export)' // Eksklusi kolom dengan kelas 'no-export'
-            //                 },
-            //             },
-            //             {
-            //                 extend: 'print',
-            //                 text: 'Print',
-            //                 exportOptions: {
-            //                     columns: ':not(.no-export)' // Eksklusi kolom dengan kelas 'no-export'
-            //                 },
-            //             }
-            //         ]
-            //     }
-            // ],
+
+
             initComplete: function() {
                 var select = $('<select id="roleFilter" class="form-select-sm" style="width: 24%; border: 1px solid #1156bf; color:#043277; font-weight: 500"><option value="">Semua Role</option></select>')
                     .appendTo($('#datatable_filter').css('display', 'flex').css('align-items', 'center').css('gap', '10px')) // Tambahkan dropdown ke sebelah search box
@@ -358,6 +315,42 @@
                     subtree: true
                 });
             }
+        });
+
+        $('#datatable').on('click', '.delete-btn', function(e) {
+            e.preventDefault();
+            var url = $(this).attr('href');
+
+            Swal.fire({
+                title: 'Apakah Anda yakin?',
+                text: 'Data pengguna ini akan dihapus!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Ya, hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: url,
+                        type: 'POST',
+                        data: {
+                            '_token': '{{ csrf_token() }}'
+                        },
+                        success: function(response) {
+                            Swal.fire('Dihapus!', response.message, 'success');
+                            table.ajax.reload();
+                        },
+                        error: function(xhr) {
+                            Swal.fire(
+                                'Error ' + xhr.status,
+                                xhr.responseJSON?.message || 'Data pengguna gagal dihapus.',
+                                'error'
+                            );
+                        }
+                    });
+                }
+            });
         });
 
         $(document).ready(function() {

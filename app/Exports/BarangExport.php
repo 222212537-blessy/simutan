@@ -6,6 +6,7 @@ use App\Models\Barang;
 use App\Models\Pemasukan;
 use App\Models\Pengeluaran;
 use App\Models\StokAwalBulan;
+use App\Models\User;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithDrawings;
@@ -19,11 +20,13 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
 {
     protected $barang;
     protected $tanggal;
+    protected $admin;
 
-    public function __construct($barang, $tanggal)
+    public function __construct($barang, $tanggal, User $admin)
     {
         $this->barang = $barang;
         $this->tanggal = Carbon::parse($tanggal);
+        $this->admin = $admin;
     }
 
     public function collection()
@@ -410,9 +413,17 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $formattedDate = $selectedDate->isoFormat('D MMMM Y'); // Format tanggal dalam bahasa Indonesia
 
         // Gunakan tanggal tersebut pada cell yang diinginkan
+        $sheet->mergeCells("B$approvalStartRow:D$approvalStartRow");
         $sheet->setCellValue("B$approvalStartRow", "Disetujui tanggal, $formattedDate");
+        $sheet->mergeCells("B" . ($approvalStartRow + 1) . ":D" . ($approvalStartRow + 1));
         $sheet->setCellValue("B" . ($approvalStartRow + 1), "Kuasa Pengguna Anggaran");
+        $sheet->mergeCells("B" . ($approvalStartRow + 2) . ":D" . ($approvalStartRow + 2));
         $sheet->setCellValue("B" . ($approvalStartRow + 2), "Kepala BPS Kota Jakarta Utara");
+
+        // Reserve blank rows for the stamp and both signatures.
+        for ($row = $approvalStartRow + 3; $row <= $approvalStartRow + 8; $row++) {
+            $sheet->getRowDimension($row)->setRowHeight(20);
+        }
 
         // Apply center alignment and Cambria font
         $sheet->getStyle("B$approvalStartRow:B" . ($approvalStartRow + 2))->applyFromArray([
@@ -430,26 +441,32 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $drawingStamp = new Drawing();
         $drawingStamp->setPath(public_path('backend/assets/images/stampel-jakut.png')); // Path to your stamp image
         $drawingStamp->setHeight(160); // Adjust height to make it bigger
-        $drawingStamp->setCoordinates("B" . ($approvalStartRow + 3)); // Position stamp in column B
-        $drawingStamp->setOffsetX(60); // Center the stamp horizontally in the cell
-        $drawingStamp->setOffsetY(-40); // Move the stamp up a bit
+        $drawingStamp->setCoordinates("B" . ($approvalStartRow + 3)); // Position stamp one row higher
+        $drawingStamp->setOffsetX(140); // Center the stamp in the B-D approval area
+        $drawingStamp->setOffsetY(0);
         $drawingStamp->setWorksheet($sheet);
 
-        // Add the signature image (aligned to the right in column B)
-        $drawingSignature1 = new Drawing();
-        $drawingSignature1->setPath(public_path('backend/assets/images/users/ttd_1.png')); // Path to the signature image
-        $drawingSignature1->setHeight(150); // Increase the height for a bigger signature
-        $drawingSignature1->setCoordinates("B" . ($approvalStartRow + 4)); // Position signature in column B
-        $drawingSignature1->setOffsetX(150); // Move the signature to the right in the cell
-        $drawingSignature1->setOffsetY(-50); // Move the signature up a bit
-        $drawingSignature1->setWorksheet($sheet);
+        // Add the signature image only when the configured file exists.
+        $signaturePath1 = public_path('backend/assets/images/users/ttd_61.png');
+
+        if (is_file($signaturePath1)) {
+            $drawingSignature1 = new Drawing();
+            $drawingSignature1->setPath($signaturePath1);
+            $drawingSignature1->setHeight(150);
+            $drawingSignature1->setCoordinates("B" . ($approvalStartRow + 3));
+            $drawingSignature1->setOffsetX(140);
+            $drawingSignature1->setOffsetY(0);
+            $drawingSignature1->setWorksheet($sheet);
+        }
 
         // Set the name and NIP after the stamp and signature
-        $sheet->setCellValue("B" . ($approvalStartRow + 8), "Favten Ari Pujiastuti, S.Si, S.ST, M.E");
-        $sheet->setCellValue("B" . ($approvalStartRow + 9), "NIP. 197804112000122002");
+        $sheet->mergeCells("B" . ($approvalStartRow + 9) . ":D" . ($approvalStartRow + 9));
+        $sheet->setCellValue("B" . ($approvalStartRow + 9), "Theresia Parwati SST, M. I. Kom.");
+        $sheet->mergeCells("B" . ($approvalStartRow + 10) . ":D" . ($approvalStartRow + 10));
+        $sheet->setCellValue("B" . ($approvalStartRow + 10), "NIP. ");
 
         // Apply center alignment and Cambria font for name and NIP
-        $sheet->getStyle("B" . ($approvalStartRow + 8) . ":B" . ($approvalStartRow + 9))->applyFromArray([
+        $sheet->getStyle("B" . ($approvalStartRow + 9) . ":B" . ($approvalStartRow + 10))->applyFromArray([
             'font' => [
                 'name' => 'Cambria',
                 'size' => 12,
@@ -457,8 +474,12 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             'alignment' => [
                 'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
                 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
             ],
         ]);
+
+        $sheet->getRowDimension($approvalStartRow + 9)->setRowHeight(25);
+        $sheet->getRowDimension($approvalStartRow + 10)->setRowHeight(25);
 
         // Add another signature block in columns G-J (split into separate lines)
         $sheet->mergeCells("G$approvalStartRow:J" . ($approvalStartRow));
@@ -471,14 +492,14 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->setCellValue("G" . ($approvalStartRow + 2), "Staf Subbagian Tata Usaha");
 
         // Add spacing for the signature and name
-        $sheet->mergeCells("G" . ($approvalStartRow + 8) . ":J" . ($approvalStartRow + 8));
-        $sheet->setCellValue("G" . ($approvalStartRow + 8), "Juniaty Pardede, A.Md");
-
         $sheet->mergeCells("G" . ($approvalStartRow + 9) . ":J" . ($approvalStartRow + 9));
-        $sheet->setCellValue("G" . ($approvalStartRow + 9), "NIP. 199006302012122004");
+        $sheet->setCellValue("G" . ($approvalStartRow + 9), $this->admin->name);
+
+        $sheet->mergeCells("G" . ($approvalStartRow + 10) . ":J" . ($approvalStartRow + 10));
+        $sheet->setCellValue("G" . ($approvalStartRow + 10), "NIP. ");
 
         // Apply center alignment and Cambria font for the signature block
-        $sheet->getStyle("G$approvalStartRow:J" . ($approvalStartRow + 9))->applyFromArray([
+        $sheet->getStyle("G$approvalStartRow:J" . ($approvalStartRow + 10))->applyFromArray([
             'font' => [
                 'name' => 'Cambria',
                 'size' => 12,
@@ -490,14 +511,20 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             ],
         ]);
 
-        // Add the second signature image (aligned in column G)
-        $drawingSignature2 = new Drawing();
-        $drawingSignature2->setPath(public_path('backend/assets/images/users/ttd_4.png')); // Path to the second signature image
-        $drawingSignature2->setHeight(150); // Increase the height for a bigger signature
-        $drawingSignature2->setCoordinates("H" . ($approvalStartRow + 4)); // Position signature in column G
-        $drawingSignature2->setOffsetX(20); // Move the signature to the right in the cell
-        $drawingSignature2->setOffsetY(-50); // Move the signature up a bit
-        $drawingSignature2->setWorksheet($sheet);
+        // Add the admin signature image (aligned in column G)
+        if ($this->admin->ttd) {
+            $signaturePath = public_path($this->admin->ttd);
+
+            if (is_file($signaturePath)) {
+                $drawingSignature2 = new Drawing();
+                $drawingSignature2->setPath($signaturePath);
+                $drawingSignature2->setHeight(150);
+                $drawingSignature2->setCoordinates("H" . ($approvalStartRow + 3));
+                $drawingSignature2->setOffsetX(60);
+                $drawingSignature2->setOffsetY(0);
+                $drawingSignature2->setWorksheet($sheet);
+            }
+        }
     }
     
     private function getDayName($date)

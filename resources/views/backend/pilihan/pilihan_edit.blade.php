@@ -295,14 +295,14 @@ $(document).ready(function() {
 
         items.forEach(item => {
             const stok = parseInt(item.qty_item) || 0;
-            const foto = item.foto_barang ? '/' + item.foto_barang : '/backend/assets/images/barang/default_atk.png';
+            const foto = item.foto_url || "{{ asset('upload/no_image.jpg') }}";
 
             html += `
             <div class="col">
                 <div class="product-card h-100 shadow-sm d-flex flex-column justify-content-between">
                     <div>
                         <div class="product-img-wrapper">
-                            <img src="${foto}" class="product-img" onerror="this.onerror=null; this.src='/backend/assets/images/barang/default_atk.png';">
+                            <img src="${foto}" class="product-img" onerror="this.onerror=null; this.src='{{ asset('upload/no_image.jpg') }}';">
                         </div>
                         <div class="p-3 pb-0">
                             <h6 class="fw-bold text-dark text-truncate mb-1" title="${item.nama}">${item.nama}</h6>

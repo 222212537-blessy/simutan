@@ -232,7 +232,7 @@
                                                     @foreach ($barang as $item)
                                                         @php
                                                             $stok = (int) $item->qty_item;
-                                                            $foto = $item->foto_barang ? '/' . $item->foto_barang : '/backend/assets/images/barang/default_atk.png';
+                                                            $foto = $item->foto_barang ? asset($item->foto_barang) : asset('upload/no_image.jpg');
                                                             $kelompokNama = optional($item->kelompok)->nama ?? 'N/A';
                                                             $kategoriNama = optional($item->kategori)->nama ?? '';
                                                         @endphp
@@ -241,7 +241,7 @@
                                                                 <div>
                                                                     <div class="product-img-wrapper">
                                                                         <img src="{{ $foto }}" class="product-img"
-                                                                            onerror="this.onerror=null; this.src='/backend/assets/images/barang/default_atk.png';">
+                                                                            onerror="this.onerror=null; this.src='{{ asset('upload/no_image.jpg') }}';">
                                                                     </div>
                                                                     <div class="p-3 pb-0">
                                                                         <h6 class="fw-bold text-dark text-truncate mb-1" title="{{ $item->nama }}">{{ $item->nama }}</h6>

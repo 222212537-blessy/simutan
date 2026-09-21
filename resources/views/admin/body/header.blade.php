@@ -81,9 +81,12 @@
             $id = Auth::user()->id;
             $adminData = App\Models\User::find($id);
             $profileImage = $adminData->foto ?? $adminData->profile_image ?? null;
-            $profileImageUrl = $profileImage
-                ? (str_contains($profileImage, '/') ? asset(ltrim($profileImage, '/')) : asset('upload/admin_images/' . $profileImage))
-                : asset('upload/no_image.jpg');
+            $profileImagePath = $profileImage && str_contains($profileImage, '/')
+                ? ltrim($profileImage, '/')
+                : ($profileImage ? 'upload/admin_images/' . $profileImage : null);
+            $profileImageUrl = $profileImagePath && file_exists(public_path($profileImagePath))
+                ? asset($profileImagePath)
+                : asset('backend/assets/images/users/avatar-1.jpg');
             @endphp
 
             <div class="dropdown d-inline-block user-dropdown">
