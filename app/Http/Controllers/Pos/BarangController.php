@@ -381,7 +381,7 @@ class BarangController extends Controller
             // Pindahkan file foto baru ke folder tujuan
             $file->move($destinationPath, $filename);
             
-            // 💡 PERBAIKAN: Hanya simpan NAMA FILE-nya saja ke database agar sesuai dengan view Blade Anda
+            // ðŸ’¡ PERBAIKAN: Hanya simpan NAMA FILE-nya saja ke database agar sesuai dengan view Blade Anda
             $fotoPath = $filename; 
 
         } elseif ($barang->foto_barang && $validated['kode_barang'] !== $barang->kode) {
@@ -394,7 +394,7 @@ class BarangController extends Controller
             if (file_exists($oldFotoPath)) {
                 rename($oldFotoPath, $newFotoPath);
                 
-                // 💡 PERBAIKAN: Update variabel nama file baru hasil rename untuk database
+                // ðŸ’¡ PERBAIKAN: Update variabel nama file baru hasil rename untuk database
                 $fotoPath = $newFilename; 
             }
         }
@@ -447,13 +447,13 @@ class BarangController extends Controller
             Pemasukan::create([
                 'barang_id' => $barang->id, // Gunakan $barang->id yang sudah terverifikasi
                 'qty' => $qtyBaru,
-                'harga_total_pemasukan' => $hargaStokBaru, // 💡 Tambahkan kolom harga ke riwayat pemasukan
+                'harga_total_pemasukan' => $hargaStokBaru, // ðŸ’¡ Tambahkan kolom harga ke riwayat pemasukan
                 'tanggal' => now()->toDateString(),
             ]);
 
             // 4. Perbarui Stok dan Harga Total Barang (Barang Induk)
             $barang->qty_item += $qtyBaru;
-            // 💡 Tambahkan Harga Total Baru ke Harga Total Kumulatif yang sudah ada
+            // ðŸ’¡ Tambahkan Harga Total Baru ke Harga Total Kumulatif yang sudah ada
             $barang->harga_total += $hargaStokBaru;
 
             $barang->save();
@@ -480,17 +480,32 @@ class BarangController extends Controller
 
     public function barangDelete($id)
     {
-        $barang = barang::findOrFail($id);
+        $barang = Barang::findOrFail($id);
+
+        // Hapus file fisik foto jika ada
+        if (!empty($barang->foto_barang)) {
+            $destinationPath = public_path('backend/assets/images/barang');
+            // Menggunakan basename() untuk berjaga-jaga mengambil nama filenya saja, 
+            // jika format di database adalah "backend/assets/..." atau sekadar "foto_xxx.png"
+            $fileName = basename($barang->foto_barang);
+            $filePath = $destinationPath . '/' . $fileName;
+
+            if (file_exists($filePath)) {
+                @unlink($filePath); // Menghapus file dari pengelola file cPanel
+            }
+        }
+
+        // Hapus data dari tabel database
         $barang->delete();
 
         // Jika request berasal dari AJAX, kembalikan JSON response
         if (request()->ajax()) {
-            return response()->json(['message' => 'Data barang berhasil dihapus.']);
+            return response()->json(['message' => 'Data barang beserta foto berhasil dihapus permanen.']);
         }
 
         // Jika bukan AJAX, lanjutkan dengan redirect
         $notification = array(
-            'message' => 'Barang berhasil dihapus',
+            'message' => 'Barang beserta foto berhasil dihapus',
             'alert-type' => 'success'
         );
 

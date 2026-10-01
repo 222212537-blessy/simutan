@@ -324,6 +324,7 @@
         $(document).ready(function() {
             var availableQty = 0;
             var barangSatuan = '';
+            const kategoriUrlTemplate = @json(route('pilihan.get-kategori', ['kelompok_id' => '__kelompok_id__']));
 
             // Initialize cart from server-side pilihan (existing items)
             let cart = {!! json_encode($pilihan->map(function($it){ return [
@@ -476,7 +477,7 @@
 
                 if (!selectedKelompok || selectedKelompok === 'all') {
                     // If 'all' kelompok, fetch all kategoris
-                    $.getJSON("/pilihan/get-kategori/all", function(data) {
+                    $.getJSON(kategoriUrlTemplate.replace('__kelompok_id__', 'all'), function(data) {
                         if (Array.isArray(data)) {
                             data.forEach(function(kat) {
                                 $kategori.append(`<option value="${kat.id}">${kat.nama}</option>`);
@@ -491,7 +492,7 @@
                 }
 
                 // Fetch categories that belong to the selected kelompok via AJAX route
-                $.getJSON(`/pilihan/get-kategori/${selectedKelompok}`, function(data) {
+                $.getJSON(kategoriUrlTemplate.replace('__kelompok_id__', encodeURIComponent(selectedKelompok)), function(data) {
                     if (Array.isArray(data)) {
                         data.forEach(function(kat) {
                             $kategori.append(`<option value="${kat.id}">${kat.nama}</option>`);

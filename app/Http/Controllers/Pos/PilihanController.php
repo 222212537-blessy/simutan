@@ -421,7 +421,13 @@ class PilihanController extends Controller
 
     public function getKategori($kelompok_id)
     {
-        $kategoris = Kategori::where('kelompok_id', $kelompok_id)->get();
+        $query = Kategori::query();
+
+        if ($kelompok_id !== 'all') {
+            $query->where('kelompok_id', $kelompok_id);
+        }
+
+        $kategoris = $query->get();
         return response()->json($kategoris);
     }
 }

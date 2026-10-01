@@ -32,45 +32,26 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
     public function collection()
     {
         return $this->barang->map(function ($item, $key) {
-            // ---------------------------------------------------------------
             // Kalkulasi stok HISTORIS pada tanggal yang dipilih
-            // Pendekatan: mundur dari stok SAAT INI di tabel barangs
-            //
-            // Rumus:
-            //   Stok(tgl X) = qty_item_sekarang
-            //                 + pengeluaran SETELAH tgl X  (sudah keluar, berarti dulu masih ada)
-            //                 - pemasukan   SETELAH tgl X  (belum masuk di tgl X)
-            //
-            // Ini lebih andal karena tidak bergantung pada stok_awal_bulans
-            // yang tidak selalu terisi setiap bulan.
-            // ---------------------------------------------------------------
-
             $stokSaatIni = max(0, (int) $item->qty_item);
 
-            // Pemasukan yang terjadi SETELAH tanggal yang diminta
             $pemasukanSetelah = Pemasukan::where('barang_id', $item->id)
                 ->whereDate('tanggal', '>', $this->tanggal)
                 ->sum('qty');
 
-            // Pengeluaran yang terjadi SETELAH tanggal yang diminta
             $pengeluaranSetelah = Pengeluaran::where('barang_id', $item->id)
                 ->whereDate('tanggal', '>', $this->tanggal)
                 ->sum('qty');
 
-            // Stok pada tanggal yang diminta — pastikan tidak negatif
             $jumlah = max(0, $stokSaatIni + $pengeluaranSetelah - $pemasukanSetelah);
 
             if ($jumlah == 0) {
-                // Jika stok habis pada tanggal tsb, kosongkan harga
                 $hargaBeliSatuan = 0;
                 $hargaTotal = 0;
             } else {
-                // Harga satuan: gunakan dari barangs (qty_item & harga_total saat ini),
-                // hitung dengan akurasi desimal (tanpa pembulatan awal) agar akurat.
                 if ($item->qty_item > 0 && $item->harga_total > 0) {
                     $hargaBeliSatuan = $item->harga_total / $item->qty_item;
                 } else {
-                    // Fallback: cari harga satuan dari stok_awal yang terdekat
                     $stokAwalFallback = StokAwalBulan::where('barang_id', $item->id)
                         ->where('harga_total', '>', 0)
                         ->where('qty_awal', '>', 0)
@@ -85,9 +66,6 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
                     }
                 }
 
-                // Jika stok yang diminta SAMA dengan stok saat ini,
-                // gunakan persis nilai harga_total dari tabel barangs.
-                // Jika berbeda (karena tanggal historis), kalikan manual.
                 if ($jumlah == $stokSaatIni && $item->harga_total > 0) {
                     $hargaTotal = $item->harga_total;
                 } else {
@@ -110,7 +88,6 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         });
     }
 
-
     private function convertNumberToWords($number)
     {
         $words = array(
@@ -125,8 +102,23 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             $units = $words[$number % 10];
             return $units ? $tens . ' ' . $units : $tens;
         } else {
-            return $number; // Handle for larger numbers if needed
+            return $number; 
         }
+    }
+
+    // FUNGSI BARU: Pencari File TTD menggunakan Absolute Path cPanel
+    private function getSignaturePath($id)
+    {
+        $baseDir = '/home/simutanw/public_html/simutan/backend/assets/images/users/';
+        $extensions = ['.png', '.PNG', '.jpg', '.JPG', '.jpeg', '.JPEG', '.webp'];
+        
+        foreach ($extensions as $ext) {
+            $path = $baseDir . 'ttd_' . $id . $ext;
+            if (file_exists($path)) {
+                return $path;
+            }
+        }
+        return null;
     }
 
     public function headings(): array
@@ -139,19 +131,20 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $drawing = new Drawing();
         $drawing->setName('Logo');
         $drawing->setDescription('This is the BPS logo');
-    
-        $imagePath = public_path('backend/assets/images/logo-bps.png');
-    
+        
+        // PERBAIKAN: Gunakan Absolute Path untuk Logo
+        $imagePath = '/home/simutanw/public_html/simutan/backend/assets/images/logo-bps.png';
+        
         $drawing->setPath($imagePath);
         $drawing->setHeight(90);
         $drawing->setCoordinates('A1');
-    
+        
         return [$drawing];
     }
 
     public function startCell(): string
     {
-        return 'A15'; // Starting cell for the data table after the custom text and headers
+        return 'A15'; 
     }
 
     public function styles(Worksheet $sheet)
@@ -187,7 +180,6 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->getStyle('A7')->getFont()->setBold(true)->setSize(12)->setUnderline(true)->setName('Cambria');
         $sheet->getStyle('A7')->getAlignment()->setHorizontal('center');
 
-        // Mengambil tanggal yang dipilih dan mengkonversinya ke format yang diinginkan
         $selectedDate = $this->tanggal;
         $dayName = $this->getDayName($selectedDate);
         $day = $this->convertNumberToWords($selectedDate->day);
@@ -200,41 +192,40 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->getStyle('A8')->getFont()->setSize(12)->setName('Cambria');
         $sheet->getStyle('A8')->getAlignment()->setWrapText(true);
 
-        // Headers with merged cells
-        $sheet->mergeCells('A11:A13'); // NO
+        // Headers
+        $sheet->mergeCells('A11:A13'); 
         $sheet->setCellValue('A11', 'No');
         
-        $sheet->mergeCells('B11:B13'); // Uraian Barang
+        $sheet->mergeCells('B11:B13'); 
         $sheet->setCellValue('B11', 'Uraian Barang');
         
-        $sheet->mergeCells('C11:C13'); // Satuan
+        $sheet->mergeCells('C11:C13'); 
         $sheet->setCellValue('C11', 'Satuan');
         
-        $sheet->mergeCells('D11:D13'); // Harga Beli Satuan (Rupiah)
+        $sheet->mergeCells('D11:D13'); 
         $sheet->setCellValue('D11', 'Harga Beli Satuan (Rupiah)');
         
-        $sheet->mergeCells('E11:F11'); // Total Persediaan
+        $sheet->mergeCells('E11:F11'); 
         $sheet->setCellValue('E11', 'Total Persediaan');
         $sheet->setCellValue('E12', 'Jumlah');
         $sheet->setCellValue('F12', 'Harga Total (Rupiah)');
         $sheet->mergeCells('E12:E13');
         $sheet->mergeCells('F12:F13');
         
-        $sheet->mergeCells('G11:H11'); // Barang Rusak
+        $sheet->mergeCells('G11:H11'); 
         $sheet->setCellValue('G11', 'Barang Rusak');
         $sheet->setCellValue('G12', 'Jumlah');
         $sheet->setCellValue('H12', 'Harga Total (Rupiah)');
         $sheet->mergeCells('G12:G13');
         $sheet->mergeCells('H12:H13');
         
-        $sheet->mergeCells('I11:J11'); // Barang Usang
+        $sheet->mergeCells('I11:J11'); 
         $sheet->setCellValue('I11', 'Barang Usang');
         $sheet->setCellValue('I12', 'Jumlah');
         $sheet->setCellValue('J12', 'Harga Total (Rupiah)');
         $sheet->mergeCells('I12:I13');
         $sheet->mergeCells('J12:J13');
     
-        // Add the row below the headers with column descriptions
         $sheet->setCellValue('A14', '(1)');
         $sheet->setCellValue('B14', '(2)');
         $sheet->setCellValue('C14', '(3)');
@@ -254,7 +245,6 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             ],
         ]);
     
-        // Style for the headers
         $sheet->getStyle('A11:J14')->applyFromArray([
             'font' => [
                 'bold' => true,
@@ -279,23 +269,21 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             ],
         ]);
     
-        $sheet->getRowDimension(13)->setRowHeight(20); // Adjust the height as needed
-        $sheet->getRowDimension(8)->setRowHeight(50); // Adjust the height as needed
+        $sheet->getRowDimension(13)->setRowHeight(20); 
+        $sheet->getRowDimension(8)->setRowHeight(50); 
     
-        // Adjust column widths
-        $sheet->getColumnDimension('A')->setWidth(5);  // NO
-        $sheet->getColumnDimension('B')->setWidth(40); // Uraian Barang
-        $sheet->getColumnDimension('C')->setWidth(12); // Satuan
-        $sheet->getColumnDimension('D')->setWidth(10); // Harga Beli Satuan (Rupiah)
-        $sheet->getColumnDimension('E')->setWidth(10); // Total Persediaan Jumlah
-        $sheet->getColumnDimension('F')->setWidth(15); // Total Persediaan Harga Total (Rupiah)
-        $sheet->getColumnDimension('G')->setWidth(10); // Barang Rusak Jumlah
-        $sheet->getColumnDimension('H')->setWidth(15); // Barang Rusak Harga Total (Rupiah)
-        $sheet->getColumnDimension('I')->setWidth(10); // Barang Usang Jumlah
-        $sheet->getColumnDimension('J')->setWidth(15); // Barang Usang Harga Total (Rupiah)
+        $sheet->getColumnDimension('A')->setWidth(5);  
+        $sheet->getColumnDimension('B')->setWidth(40); 
+        $sheet->getColumnDimension('C')->setWidth(12); 
+        $sheet->getColumnDimension('D')->setWidth(10); 
+        $sheet->getColumnDimension('E')->setWidth(10); 
+        $sheet->getColumnDimension('F')->setWidth(15); 
+        $sheet->getColumnDimension('G')->setWidth(10); 
+        $sheet->getColumnDimension('H')->setWidth(15); 
+        $sheet->getColumnDimension('I')->setWidth(10); 
+        $sheet->getColumnDimension('J')->setWidth(15); 
     
-        // Apply styles to the data rows
-        $startingRow = 15; // Data starts from row 15 after the header
+        $startingRow = 15; 
         $dataRowCount = $this->barang->count();
         $dataEndRow = $startingRow + $dataRowCount - 1;
     
@@ -315,24 +303,19 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             ],
         ]);
     
-        // Center alignment specifically for "No" and "Satuan" columns
         $sheet->getStyle("A$startingRow:A$dataEndRow")->getAlignment()->setHorizontal('center');
         $sheet->getStyle("C$startingRow:C$dataEndRow")->getAlignment()->setHorizontal('center');
     
-        // Format angka Indonesia: titik sebagai pemisah ribuan (sesuai regional setting Indonesia)
-        // #,##0 = bilangan bulat dengan pemisah ribuan, tanpa desimal
         $sheet->getStyle("D$startingRow:D$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle("E$startingRow:E$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle("F$startingRow:F$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle("H$startingRow:H$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle("J$startingRow:J$dataEndRow")->getNumberFormat()->setFormatCode('#,##0');
     
-        // Set the row height for all data rows to 20
         for ($row = $startingRow; $row <= $dataEndRow; $row++) {
             $sheet->getRowDimension($row)->setRowHeight(30);
         }
     
-        // Add the "Jumlah" row
         $sheet->mergeCells("A" . ($dataEndRow + 1) . ":D" . ($dataEndRow + 1)); 
         $sheet->setCellValue("A" . ($dataEndRow + 1), 'Jumlah');
         $sheet->getStyle("A" . ($dataEndRow + 1))->getFont()->setBold(true);
@@ -342,7 +325,6 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->setCellValue("H" . ($dataEndRow + 1), '=SUM(H' . $startingRow . ':H' . $dataEndRow . ')');
         $sheet->setCellValue("J" . ($dataEndRow + 1), '=SUM(J' . $startingRow . ':J' . $dataEndRow . ')');
     
-        // Format angka untuk baris Jumlah (total)
         $sheet->getStyle("E" . ($dataEndRow + 1))->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle("F" . ($dataEndRow + 1))->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle("H" . ($dataEndRow + 1))->getNumberFormat()->setFormatCode('#,##0');
@@ -367,13 +349,12 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             'fill' => [
                 'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
                 'startColor' => [
-                    'rgb' => '9BC2E6', // Same background color as the headers
+                    'rgb' => '9BC2E6', 
                 ],
             ],
         ]);
     
-        // Add the closing statement row
-        $sheet->mergeCells("A" . ($dataEndRow + 2) . ":G" . ($dataEndRow + 2)); // Merge for the statement
+        $sheet->mergeCells("A" . ($dataEndRow + 2) . ":G" . ($dataEndRow + 2)); 
         $sheet->setCellValue("A" . ($dataEndRow + 2), 'Total Persediaan-Barang Rusak-Barang Usang = (11) - (12) - (13)');
         $sheet->getStyle("A" . ($dataEndRow + 2))->getFont()->setBold(true);
     
@@ -406,13 +387,9 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->getRowDimension($dataEndRow + 1)->setRowHeight(40); 
         $sheet->getRowDimension($dataEndRow + 2)->setRowHeight(30);
 
-        // Start adding approval information 2 rows after the data ends
         $approvalStartRow = $dataEndRow + 4;
+        $formattedDate = $selectedDate->isoFormat('D MMMM Y'); 
 
-        // Set approval text before the stamp and signature
-        $formattedDate = $selectedDate->isoFormat('D MMMM Y'); // Format tanggal dalam bahasa Indonesia
-
-        // Gunakan tanggal tersebut pada cell yang diinginkan
         $sheet->mergeCells("B$approvalStartRow:D$approvalStartRow");
         $sheet->setCellValue("B$approvalStartRow", "Disetujui tanggal, $formattedDate");
         $sheet->mergeCells("B" . ($approvalStartRow + 1) . ":D" . ($approvalStartRow + 1));
@@ -420,12 +397,10 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->mergeCells("B" . ($approvalStartRow + 2) . ":D" . ($approvalStartRow + 2));
         $sheet->setCellValue("B" . ($approvalStartRow + 2), "Kepala BPS Kota Jakarta Utara");
 
-        // Reserve blank rows for the stamp and both signatures.
         for ($row = $approvalStartRow + 3; $row <= $approvalStartRow + 8; $row++) {
             $sheet->getRowDimension($row)->setRowHeight(20);
         }
 
-        // Apply center alignment and Cambria font
         $sheet->getStyle("B$approvalStartRow:B" . ($approvalStartRow + 2))->applyFromArray([
             'font' => [
                 'name' => 'Cambria',
@@ -437,19 +412,18 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             ],
         ]);
 
-        // Add the stamp image (centered in column B)
+        // PERBAIKAN: Gunakan Absolute Path untuk Stempel
         $drawingStamp = new Drawing();
-        $drawingStamp->setPath(public_path('backend/assets/images/stampel-jakut.png')); // Path to your stamp image
-        $drawingStamp->setHeight(160); // Adjust height to make it bigger
-        $drawingStamp->setCoordinates("B" . ($approvalStartRow + 3)); // Position stamp one row higher
-        $drawingStamp->setOffsetX(140); // Center the stamp in the B-D approval area
+        $drawingStamp->setPath('/home/simutanw/public_html/simutan/backend/assets/images/stampel-jakut.png');
+        $drawingStamp->setHeight(160);
+        $drawingStamp->setCoordinates("B" . ($approvalStartRow + 3)); 
+        $drawingStamp->setOffsetX(140); 
         $drawingStamp->setOffsetY(0);
         $drawingStamp->setWorksheet($sheet);
 
-        // Add the signature image only when the configured file exists.
-        $signaturePath1 = public_path('backend/assets/images/users/ttd_61.png');
-
-        if (is_file($signaturePath1)) {
+        // PERBAIKAN: TTD Kepala BPS (Asumsi ID 61 berdasarkan script sebelumnya)
+        $signaturePath1 = $this->getSignaturePath(61);
+        if ($signaturePath1 && is_file($signaturePath1)) {
             $drawingSignature1 = new Drawing();
             $drawingSignature1->setPath($signaturePath1);
             $drawingSignature1->setHeight(150);
@@ -459,13 +433,11 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             $drawingSignature1->setWorksheet($sheet);
         }
 
-        // Set the name and NIP after the stamp and signature
         $sheet->mergeCells("B" . ($approvalStartRow + 9) . ":D" . ($approvalStartRow + 9));
         $sheet->setCellValue("B" . ($approvalStartRow + 9), "Theresia Parwati SST, M. I. Kom.");
         $sheet->mergeCells("B" . ($approvalStartRow + 10) . ":D" . ($approvalStartRow + 10));
         $sheet->setCellValue("B" . ($approvalStartRow + 10), "NIP. ");
 
-        // Apply center alignment and Cambria font for name and NIP
         $sheet->getStyle("B" . ($approvalStartRow + 9) . ":B" . ($approvalStartRow + 10))->applyFromArray([
             'font' => [
                 'name' => 'Cambria',
@@ -481,7 +453,6 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->getRowDimension($approvalStartRow + 9)->setRowHeight(25);
         $sheet->getRowDimension($approvalStartRow + 10)->setRowHeight(25);
 
-        // Add another signature block in columns G-J (split into separate lines)
         $sheet->mergeCells("G$approvalStartRow:J" . ($approvalStartRow));
         $sheet->setCellValue("G$approvalStartRow", "Jakarta, $formattedDate");
 
@@ -491,14 +462,12 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
         $sheet->mergeCells("G" . ($approvalStartRow + 2) . ":J" . ($approvalStartRow + 2));
         $sheet->setCellValue("G" . ($approvalStartRow + 2), "Staf Subbagian Tata Usaha");
 
-        // Add spacing for the signature and name
         $sheet->mergeCells("G" . ($approvalStartRow + 9) . ":J" . ($approvalStartRow + 9));
         $sheet->setCellValue("G" . ($approvalStartRow + 9), $this->admin->name);
 
         $sheet->mergeCells("G" . ($approvalStartRow + 10) . ":J" . ($approvalStartRow + 10));
         $sheet->setCellValue("G" . ($approvalStartRow + 10), "NIP. ");
 
-        // Apply center alignment and Cambria font for the signature block
         $sheet->getStyle("G$approvalStartRow:J" . ($approvalStartRow + 10))->applyFromArray([
             'font' => [
                 'name' => 'Cambria',
@@ -511,13 +480,13 @@ class BarangExport implements FromCollection, WithHeadings, WithDrawings, WithCu
             ],
         ]);
 
-        // Add the admin signature image (aligned in column G)
-        if ($this->admin->ttd) {
-            $signaturePath = public_path($this->admin->ttd);
+        // PERBAIKAN: TTD Admin (Petugas Pengelola) menggunakan fungsi getSignaturePath
+        if ($this->admin) {
+            $signaturePath2 = $this->getSignaturePath($this->admin->id);
 
-            if (is_file($signaturePath)) {
+            if ($signaturePath2 && is_file($signaturePath2)) {
                 $drawingSignature2 = new Drawing();
-                $drawingSignature2->setPath($signaturePath);
+                $drawingSignature2->setPath($signaturePath2);
                 $drawingSignature2->setHeight(150);
                 $drawingSignature2->setCoordinates("H" . ($approvalStartRow + 3));
                 $drawingSignature2->setOffsetX(60);
